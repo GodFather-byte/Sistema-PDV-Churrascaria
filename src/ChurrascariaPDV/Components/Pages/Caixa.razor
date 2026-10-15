@@ -144,6 +144,10 @@
                                     <small>@Formato.Moeda(comanda.Resumo.Saldo)</small>
                                 </button>
                             }
+                            @if (ComandaVaziaSelecionada is { } vazia)
+                            {
+                                <button type="button" class="chip chip-tracejado" @onclick="AbrirCancelarComanda">🗑 Cancelar comanda @vazia.CodigoNumero</button>
+                            }
                         </div>
                     }
 
@@ -446,6 +450,20 @@
         </Rodape>
     </Modal>
 
+    <Modal Aberto="_modal == ModalCaixa.CancelarComanda" Titulo="Cancelar comanda vazia?" OnFechar="FecharModal">
+        <ChildContent>
+            @if (ComandaSelecionada is { } comanda)
+            {
+                <p><strong>@comanda.Descricao</strong> não tem itens lançados nem pagamentos e será cancelada.</p>
+                <p class="text-muted mb-0">O número do cartão volta a ficar livre e o consumo da mesa não é alterado.</p>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModal">Voltar</button>
+            <button type="button" class="btn btn-lg btn-danger flex-grow-1" disabled="@_ocupado" @onclick="CancelarComandaAsync">Cancelar comanda</button>
+        </Rodape>
+    </Modal>
+
     <Modal Aberto="_modal == ModalCaixa.QrCode" Titulo="Conectar celulares dos garçons" OnFechar="FecharModal">
         <ChildContent>
             <div class="qr-code">
@@ -475,7 +493,7 @@
 </AreaProtegida>
 
 @code {
-    private enum ModalCaixa { Nenhum, Lancar, TransferirMesa, TransferirItem, Cancelar, Estorno, NovaComanda, QrCode }
+    private enum ModalCaixa { Nenhum, Lancar, TransferirMesa, TransferirItem, Cancelar, Estorno, NovaComanda, CancelarComanda, QrCode }
 
     private static readonly PerfilUsuario[] PerfisCaixa = [PerfilUsuario.OperadorCaixa, PerfilUsuario.Gerente];
     private static readonly string[] MotivosCancelamento = ["Cliente desistiu", "Erro de digitação", "Demora no preparo", "Produto em falta", "Cortesia"];
@@ -521,6 +539,10 @@
     private bool MesaAberta => _detalhe?.Status is StatusMesa.Ocupada or StatusMesa.ContaSolicitada;
 
     private ComandaDetalhe? ComandaSelecionada => _comandaId is null ? null : _detalhe?.Comandas.FirstOrDefault(c => c.Id == _comandaId);
+
+    /// <summary>Comanda individual selecionada sem itens nem pagamentos: pode ser cancelada.</summary>
+    private ComandaDetalhe? ComandaVaziaSelecionada =>
+        ComandaSelecionada is { ContaGeral: false, Itens.Count: 0, Pagamentos.Count: 0 } comanda ? comanda : null;
 
     private IEnumerable<ItemConsumo> ItensVisiveis => _detalhe is null
         ? []
@@ -924,6 +946,21 @@
             await RecarregarTudoAsync();
             SelecionarComanda(id);
         }, "Comanda criada.");
+    }
+
+    private void AbrirCancelarComanda() => _modal = ModalCaixa.CancelarComanda;
+
+    private async Task CancelarComandaAsync()
+    {
+        if (_detalhe is null || ComandaVaziaSelecionada is not { } comanda) return;
+        var codigo = comanda.CodigoNumero;
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.CancelarComandaVaziaAsync(_detalhe.Id, comanda.Id);
+            _modal = ModalCaixa.Nenhum;
+            _comandaId = null;
+            await RecarregarTudoAsync();
+        }, $"Comanda {codigo} cancelada.");
     }
 
     // ---------- Recebimento ----------

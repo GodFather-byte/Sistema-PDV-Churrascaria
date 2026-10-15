@@ -88,6 +88,10 @@
                                     <strong>@comanda.Descricao</strong>
                                     <span>@Formato.Moeda(comanda.Resumo.Saldo)</span>
                                 </div>
+                                @if (!comanda.ContaGeral && comanda.Itens.Count == 0 && comanda.Pagamentos.Count == 0)
+                                {
+                                    <button type="button" class="btn btn-sm btn-link text-danger px-0" @onclick="() => _comandaCancelando = comanda">Comanda vazia · cancelar</button>
+                                }
                                 @foreach (var item in comanda.Itens)
                                 {
                                     <div class="garcom-item @(item.Cancelado ? "cancelado" : string.Empty)">
@@ -208,6 +212,20 @@
             <button type="button" class="btn btn-lg btn-brasa flex-grow-1" disabled="@_ocupado" @onclick="CriarComandaAsync">Criar</button>
         </Rodape>
     </Modal>
+
+    <Modal Aberto="_comandaCancelando is not null" Titulo="Cancelar comanda vazia?" OnFechar="() => _comandaCancelando = null">
+        <ChildContent>
+            @if (_comandaCancelando is { } comanda)
+            {
+                <p><strong>@comanda.Descricao</strong> não tem itens lançados nem pagamentos e será cancelada.</p>
+                <p class="text-muted mb-0">O número do cartão volta a ficar livre e o consumo da mesa não é alterado.</p>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="() => _comandaCancelando = null">Voltar</button>
+            <button type="button" class="btn btn-lg btn-danger flex-grow-1" disabled="@_ocupado" @onclick="CancelarComandaAsync">Cancelar comanda</button>
+        </Rodape>
+    </Modal>
 </AreaProtegida>
 
 @code {
@@ -231,6 +249,7 @@
     private bool _ocupado;
     private bool _confirmarConta;
     private bool _novaComanda;
+    private ComandaDetalhe? _comandaCancelando;
     private string? _codigoComanda;
     private string? _nomeComanda;
     private string? _aviso;
@@ -421,6 +440,27 @@
             _comandaId = await MesaService.CriarComandaAsync(mesaId, codigo, _nomeComanda);
             _novaComanda = false;
             await RecarregarDetalheAsync();
+        });
+    }
+
+    private async Task CancelarComandaAsync()
+    {
+        if (_comandaCancelando is not { } comanda || _mesaId is not { } mesaId)
+        {
+            return;
+        }
+
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.CancelarComandaVaziaAsync(mesaId, comanda.Id);
+            _comandaCancelando = null;
+            if (_comandaId == comanda.Id)
+            {
+                _comandaId = null;
+            }
+
+            await RecarregarDetalheAsync();
+            Avisar($"Comanda {comanda.CodigoNumero} cancelada.", "sucesso");
         });
     }
 

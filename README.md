@@ -137,6 +137,8 @@ Cada instalação usa seu próprio banco; não há isolamento de múltiplos esta
 - **Abertura automática** da mesa no primeiro item; grupos com **Sugerir pessoas** usam a quantidade para sugerir o número de pessoas.
   O perfil inicial associa essa regra aos rodízios existentes.
 - **Conta geral ou comandas individuais** na mesma mesa; comanda individual quitada é encerrada sem liberar a mesa.
+- **Comanda individual vazia** (sem itens lançados e sem pagamentos) pode ser cancelada pelo caixa ou pelo garçom:
+  o número do cartão volta a ficar livre e a mesa só é liberada quando não há outras comandas abertas nem consumo anterior.
 - **Transferência de mesa**: leva todas as comandas; se o destino estiver ocupado as contas são juntadas.
   A origem fica aguardando limpeza.
 - **Transferência de item** (total ou parcial) para outra comanda, da mesma mesa ou de outra.

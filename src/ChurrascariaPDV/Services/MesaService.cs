@@ -183,6 +183,49 @@ public class MesaService(
         return comanda.Id;
     }
 
+    /// <summary>
+    /// Cancela uma comanda individual vazia (criada por engano ou esvaziada por transferência),
+    /// liberando o número do cartão. Só é permitido quando não há itens nem pagamentos.
+    /// </summary>
+    public async Task CancelarComandaVaziaAsync(int mesaId, int comandaId)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        await using var transacao = await db.Database.BeginTransactionAsync();
+        var mesa = await ContaMesa.ObterMesaAsync(db, mesaId);
+        var comanda = await db.Comandas
+            .Include(c => c.Pedidos).ThenInclude(p => p.Itens)
+            .Include(c => c.Pagamentos)
+            .FirstOrDefaultAsync(c => c.Id == comandaId && c.MesaId == mesa.Id && c.Status == StatusComanda.Aberta)
+            ?? throw new RegraNegocioException("Comanda não encontrada ou já encerrada.");
+
+        if (comanda.ContaGeral)
+        {
+            throw new RegraNegocioException("A conta geral não pode ser cancelada. Cancele os itens ou finalize a conta.");
+        }
+
+        if (comanda.Pedidos.SelectMany(p => p.Itens).Any() || comanda.Pagamentos.Any())
+        {
+            throw new RegraNegocioException("Só é possível cancelar comandas sem itens lançados e sem pagamentos.");
+        }
+
+        comanda.Status = StatusComanda.Cancelada;
+        comanda.DataHoraFechamento = DateTime.Now;
+        await db.SaveChangesAsync();
+
+        if (!await db.Comandas.AnyAsync(c => c.MesaId == mesa.Id && c.Status == StatusComanda.Aberta))
+        {
+            // A mesa foi aberta apenas para esta comanda: volta a ficar livre,
+            // ou aguardando limpeza se já havia consumo anterior (comandas fechadas/estornadas).
+            var houveConsumo = await db.ItensPedido.AnyAsync(i => i.Pedido.MesaId == mesa.Id)
+                               || await db.Pagamentos.AnyAsync(p => p.MesaId == mesa.Id);
+            ContaMesa.Desocupar(mesa, houveConsumo ? StatusMesa.AguardandoLimpeza : StatusMesa.Livre);
+            await db.SaveChangesAsync();
+        }
+
+        await transacao.CommitAsync();
+        await notificador.NotificarAsync(mesa.Id);
+    }
+
     /// <summary>Liga/desliga a taxa de serviço de uma comanda ou de todas as comandas abertas da mesa.</summary>
     public async Task DefinirTaxaServicoAsync(int mesaId, int? comandaId, bool cobrar)
     {

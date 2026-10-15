@@ -1,0 +1,14 @@
+@if (!string.IsNullOrEmpty(Mensagem))
+{
+    <div class="pdv-aviso pdv-aviso-@Tipo" role="alert" @onclick="OnFechar">
+        <span>@Mensagem</span>
+        <button type="button" aria-label="Fechar">✕</button>
+    </div>
+}
+
+@code {
+    [Parameter] public string? Mensagem { get; set; }
+    /// <summary>sucesso, erro ou info.</summary>
+    [Parameter] public string Tipo { get; set; } = "info";
+    [Parameter] public EventCallback OnFechar { get; set; }
+}

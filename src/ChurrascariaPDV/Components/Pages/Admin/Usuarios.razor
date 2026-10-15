@@ -1,0 +1,90 @@
+@page "/admin/usuarios"
+@inject UsuarioService UsuarioService
+
+<PageTitle>Usuários</PageTitle>
+
+<AreaProtegida Area="gerencia" Titulo="Usuários (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => CarregarAsync()">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Usuários e PINs</h1>
+        <button type="button" class="btn btn-brasa" @onclick="() => Editar(null)">+ Usuário</button>
+    </div>
+
+    <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+    <div class="painel">
+        <table class="table table-dark table-hover table-sm align-middle">
+            <thead><tr><th>Nome</th><th>Perfil</th><th>PIN</th><th>Ativo</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var usuario in _usuarios)
+                {
+                    <tr class="@(usuario.Ativo ? string.Empty : "text-muted")">
+                        <td>@usuario.Nome</td>
+                        <td>@Formato.Perfil(usuario.Perfil)</td>
+                        <td><code>••••</code></td>
+                        <td>@(usuario.Ativo ? "Sim" : "Não")</td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-light" @onclick="() => Editar(usuario)">Editar</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="text-muted small mb-0">PINs iniciais de demonstração: Gerente 1234 · Caixa 2222 · João 1111 · Maria 3333. Troque-os antes de usar em produção.</p>
+    </div>
+
+    <Modal Aberto="_editando is not null" Titulo="@(_editando?.Id == 0 ? "Novo usuário" : "Editar usuário")" OnFechar="() => _editando = null">
+        <ChildContent>
+            @if (_editando is not null)
+            {
+                <label class="form-label">Nome</label>
+                <input class="form-control mb-2" maxlength="100" @bind="_editando.Nome" />
+                <label class="form-label">Perfil</label>
+                <select class="form-select mb-2" @bind="_editando.Perfil">
+                    @foreach (var perfil in Enum.GetValues<PerfilUsuario>())
+                    {
+                        <option value="@perfil">@Formato.Perfil(perfil)</option>
+                    }
+                </select>
+                <label class="form-label">PIN (4 dígitos)</label>
+                <input class="form-control mb-2 pin-input" inputmode="numeric" maxlength="4" @bind="_editando.PinAcesso" />
+                <div class="form-check">
+                    <input id="usuario-ativo" class="form-check-input" type="checkbox" @bind="_editando.Ativo" />
+                    <label class="form-check-label" for="usuario-ativo">Ativo</label>
+                </div>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-secondary" @onclick="() => _editando = null">Cancelar</button>
+            <button type="button" class="btn btn-brasa flex-grow-1" @onclick="SalvarAsync">Salvar</button>
+        </Rodape>
+    </Modal>
+</AreaProtegida>
+
+@code {
+    private List<Usuario> _usuarios = [];
+    private Usuario? _editando;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private async Task CarregarAsync() => _usuarios = await UsuarioService.ListarAsync();
+
+    private void Editar(Usuario? usuario) => _editando = usuario is null
+        ? new Usuario { Perfil = PerfilUsuario.Garcom, Ativo = true }
+        : new Usuario { Id = usuario.Id, Nome = usuario.Nome, PinAcesso = usuario.PinAcesso, Perfil = usuario.Perfil, Ativo = usuario.Ativo };
+
+    private async Task SalvarAsync()
+    {
+        if (_editando is null) return;
+        try
+        {
+            await UsuarioService.SalvarAsync(_editando);
+            _editando = null;
+            await CarregarAsync();
+            _aviso = "Usuário salvo.";
+            _tipoAviso = "sucesso";
+        }
+        catch (RegraNegocioException ex)
+        {
+            _aviso = ex.Message;
+            _tipoAviso = "erro";
+        }
+    }
+}

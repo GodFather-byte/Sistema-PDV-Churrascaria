@@ -1,0 +1,1067 @@
+@page "/caixa"
+@layout TelaCheiaLayout
+@inherits ComponenteTempoReal
+@implements IAsyncDisposable
+@inject MesaService MesaService
+@inject PedidoService PedidoService
+@inject PagamentoService PagamentoService
+@inject CaixaService CaixaService
+@inject RedeLocalService Rede
+@inject IJSRuntime JS
+
+<PageTitle>Caixa · Churrascaria</PageTitle>
+
+<AreaProtegida @ref="_area" Area="caixa" Titulo="Caixa" Perfis="PerfisCaixa" OnEntrou="AoEntrarAsync">
+    <div class="caixa">
+        <header class="caixa-topo">
+            <div class="caixa-marca">🔥 Churrascaria PDV</div>
+            <div class="indicador">
+                <span>Mesas ocupadas</span>
+                <strong>@_indicadores.MesasOcupadas<small>/@_indicadores.TotalMesas</small></strong>
+            </div>
+            <div class="indicador @(_indicadores.ContasSolicitadas > 0 ? "alerta" : string.Empty)">
+                <span>Contas pedidas</span>
+                <strong>@_indicadores.ContasSolicitadas</strong>
+            </div>
+            <div class="indicador">
+                <span>Total no caixa hoje</span>
+                <strong>@Formato.Moeda(_indicadores.TotalRecebidoTurno)</strong>
+            </div>
+            <a class="indicador link @(_indicadores.TurnoAberto ? string.Empty : "perigo")" href="caixa/turno">
+                <span>Turno</span>
+                <strong>@(_indicadores.TurnoAberto ? "Aberto" : "Fechado")</strong>
+            </a>
+            @if (_digitandoMesa.Length > 0)
+            {
+                <div class="indicador digitando">
+                    <span>Ir para mesa</span>
+                    <strong>@_digitandoMesa<span class="cursor">_</span></strong>
+                </div>
+            }
+            <div class="caixa-topo-acoes">
+                <button type="button" class="btn btn-outline-light" @onclick="AbrirQrCode">📱 Garçons <kbd>F11</kbd></button>
+                <div class="dropdown-pdv">
+                    <button type="button" class="btn btn-outline-light" @onclick="() => _menuAberto = !_menuAberto">☰ Menu</button>
+                    @if (_menuAberto)
+                    {
+                        <div class="dropdown-pdv-itens" @onclick="() => _menuAberto = false">
+                            <a href="caixa/turno">Turno, sangria e fechamento</a>
+                            <a href="impressoes">Impressões (log)</a>
+                            <a href="relatorios">Relatórios</a>
+                            <a href="admin/produtos">Cardápio</a>
+                            <a href="admin/usuarios">Usuários e PINs</a>
+                            <button type="button" @onclick='() => JS.InvokeVoidAsync("pdv.telaCheia")'>Tela cheia</button>
+                            <button type="button" @onclick="() => _ajuda = true">Atalhos (F1)</button>
+                        </div>
+                    }
+                </div>
+                <div class="caixa-usuario">
+                    <span>@context.Nome</span>
+                    <button type="button" class="btn btn-sm btn-link" @onclick="SairAsync">Sair</button>
+                </div>
+            </div>
+        </header>
+
+        <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+        @if (!_indicadores.TurnoAberto)
+        {
+            <div class="caixa-faixa-alerta">
+                O caixa está fechado: não é possível receber pagamentos. <a href="caixa/turno">Abrir turno</a>
+            </div>
+        }
+
+        <div class="caixa-corpo">
+            <section class="caixa-mapa">
+                <div class="caixa-mapa-topo">
+                    <LegendaMesas />
+                    <span class="text-muted small">Digite o número da mesa + Enter para selecionar</span>
+                </div>
+                <MapaMesas Mesas="_mesas" SelecionadaId="_mesaId" Compacto="true" OnSelecionar="m => SelecionarMesaAsync(m.Id)" />
+            </section>
+
+            <section class="caixa-detalhe">
+                @if (_detalhe is null)
+                {
+                    <div class="caixa-vazio">
+                        <h2>Selecione uma mesa</h2>
+                        <p>Clique no mapa ou digite o número e pressione Enter.</p>
+                        <TabelaAtalhos />
+                    </div>
+                }
+                else
+                {
+                    var comandaFiltro = ComandaSelecionada;
+                    var resumoAlvo = comandaFiltro?.Resumo ?? _detalhe.Resumo;
+
+                    <div class="caixa-detalhe-cabecalho">
+                        <div>
+                            <h2>Mesa @_detalhe.Numero <span class="status-pill status-@Formato.ClasseStatus(_detalhe.Status)">@Formato.Status(_detalhe.Status)</span></h2>
+                            @if (_detalhe.DataHoraAbertura is { } abertura)
+                            {
+                                <span class="text-muted">Aberta às @Formato.Hora(abertura) · há @Formato.Duracao(abertura) · @_detalhe.CapacidadeLugares lugares</span>
+                            }
+                        </div>
+                        @if (MesaAberta)
+                        {
+                            <div class="stepper">
+                                <button type="button" disabled="@(_detalhe.QuantidadePessoas <= 1)" @onclick="() => AlterarPessoasAsync(-1)">−</button>
+                                <strong title="Pessoas">@_detalhe.QuantidadePessoas 👤</strong>
+                                <button type="button" @onclick="() => AlterarPessoasAsync(1)">+</button>
+                            </div>
+                        }
+                    </div>
+
+                    @if (_detalhe.Status == StatusMesa.Livre)
+                    {
+                        <div class="caixa-abrir-mesa">
+                            <p>Mesa livre. Lance um item (F2) para abrir automaticamente ou abra informando as pessoas:</p>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="stepper">
+                                    <button type="button" @onclick="() => _pessoasAbertura = Math.Max(1, _pessoasAbertura - 1)">−</button>
+                                    <strong>@_pessoasAbertura 👤</strong>
+                                    <button type="button" @onclick="() => _pessoasAbertura++">+</button>
+                                </div>
+                                <button type="button" class="btn btn-brasa" @onclick="AbrirMesaAsync">Abrir mesa</button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_detalhe.Comandas.Count > 0)
+                    {
+                        <div class="caixa-comandas">
+                            <button type="button" class="chip @(_comandaId is null ? "ativo" : string.Empty)" @onclick="() => SelecionarComanda(null)">
+                                Mesa inteira <small>@Formato.Moeda(_detalhe.Resumo.Saldo)</small>
+                            </button>
+                            @foreach (var comanda in _detalhe.Comandas)
+                            {
+                                <button type="button" class="chip @(_comandaId == comanda.Id ? "ativo" : string.Empty)" @onclick="() => SelecionarComanda(comanda.Id)">
+                                    @(comanda.ContaGeral ? "Conta Geral" : $"Comanda {comanda.CodigoNumero}")
+                                    @if (comanda.NomeCliente is not null)
+                                    {
+                                        <span> · @comanda.NomeCliente</span>
+                                    }
+                                    <small>@Formato.Moeda(comanda.Resumo.Saldo)</small>
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    <div class="caixa-itens" id="caixa-itens">
+                        <table class="table table-sm table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Hora</th>
+                                    <th>Produto</th>
+                                    <th>Garçom</th>
+                                    <th class="text-end">Qtd</th>
+                                    <th class="text-end">Unit.</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in ItensVisiveis)
+                                {
+                                    <tr class="@(item.Cancelado ? "cancelado" : string.Empty) @(item.Id == _itemId ? "selecionado" : string.Empty)"
+                                        @onclick="() => SelecionarItem(item)">
+                                        <td>@Formato.Hora(item.DataHora)</td>
+                                        <td>
+                                            @item.Produto
+                                            @if (!item.Impresso && item.Setor != SetorImpressao.Nenhum && !item.Cancelado)
+                                            {
+                                                <span class="badge bg-danger ms-1" title="Falha ao imprimir na produção">não impresso</span>
+                                            }
+                                            @if (_comandaId is null && _detalhe.Comandas.Count > 1)
+                                            {
+                                                var comanda = _detalhe.Comandas.First(c => c.Id == item.ComandaId);
+                                                <span class="badge bg-secondary ms-1">@(comanda.ContaGeral ? "Geral" : comanda.CodigoNumero.ToString())</span>
+                                            }
+                                            @if (!string.IsNullOrEmpty(item.Observacoes))
+                                            {
+                                                <small class="d-block text-muted">@item.Observacoes</small>
+                                            }
+                                            @if (item.Cancelado)
+                                            {
+                                                <small class="d-block text-danger">Cancelado: @item.MotivoCancelamento</small>
+                                            }
+                                        </td>
+                                        <td>@item.Garcom</td>
+                                        <td class="text-end">@Formato.Qtd(item.Quantidade)</td>
+                                        <td class="text-end">@Formato.Numero(item.PrecoUnitario)</td>
+                                        <td class="text-end">@Formato.Numero(item.Cancelado ? 0 : item.Total)</td>
+                                    </tr>
+                                }
+                                @if (!ItensVisiveis.Any())
+                                {
+                                    <tr><td colspan="6" class="text-center text-muted py-4">Nenhum item lançado.</td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="caixa-acoes">
+                        <button type="button" class="btn btn-acao" @onclick="AbrirLancamento"><kbd>F2</kbd> + Lançar Item</button>
+                        <button type="button" class="btn btn-acao" disabled="@(!MesaAberta)" @onclick="AbrirTransferirMesa"><kbd>F3</kbd> Transferir Mesa</button>
+                        <button type="button" class="btn btn-acao" disabled="@(ItemSelecionadoAtivo is null)" @onclick="AbrirTransferirItem"><kbd>F4</kbd> Transferir Item</button>
+                        <button type="button" class="btn btn-acao" disabled="@(!_detalhe.TemConsumo)" @onclick="ImprimirPreContaAsync"><kbd>F6</kbd> Imprimir Pré-Conta</button>
+                        <button type="button" class="btn btn-acao" disabled="@(_detalhe.Comandas.Count == 0)" @onclick="AlternarTaxaAsync"><kbd>F7</kbd> @(TaxaAtiva ? "Desativar 10%" : "Ativar 10%")</button>
+                        <button type="button" class="btn btn-acao perigo" disabled="@(ItemSelecionadoAtivo is null)" @onclick="AbrirCancelamento"><kbd>F8</kbd> Cancelar Item (PIN Gerente)</button>
+                        <button type="button" class="btn btn-acao" @onclick="AbrirNovaComanda"><kbd>F12</kbd> Nova Comanda</button>
+                        <button type="button" class="btn btn-acao" disabled="@(ItemSelecionado is null)" @onclick="ReimprimirPedidoAsync">Reimprimir Pedido</button>
+                    </div>
+
+                    <div class="caixa-fechamento">
+                        <div class="resumo-conta">
+                            <div class="titulo">@(comandaFiltro?.Descricao ?? "Mesa inteira")</div>
+                            <div><span>Subtotal dos itens</span><span>@Formato.Moeda(resumoAlvo.Subtotal)</span></div>
+                            <div>
+                                <label class="taxa-toggle">
+                                    <input type="checkbox" checked="@TaxaAtiva" disabled="@(_detalhe.Comandas.Count == 0)" @onchange="AlternarTaxaAsync" />
+                                    Taxa de serviço (10%)
+                                </label>
+                                <span>@Formato.Moeda(resumoAlvo.TaxaServico)</span>
+                            </div>
+                            <div><span>Total</span><span>@Formato.Moeda(resumoAlvo.Total)</span></div>
+                            <div><span>Pago</span><span>− @Formato.Moeda(resumoAlvo.Pago)</span></div>
+                            <div class="total"><span>Saldo devedor</span><span>@Formato.Moeda(resumoAlvo.Saldo)</span></div>
+                            @if (resumoAlvo.Saldo > 0)
+                            {
+                                <div class="divisao">
+                                    <span>Dividir por</span>
+                                    <div class="stepper pequeno">
+                                        <button type="button" @onclick="() => _pessoasDivisao = Math.Max(1, _pessoasDivisao - 1)">−</button>
+                                        <strong>@_pessoasDivisao</strong>
+                                        <button type="button" @onclick="() => _pessoasDivisao++">+</button>
+                                    </div>
+                                    <span>= <strong>@Formato.Moeda(resumoAlvo.ValorPorPessoa(_pessoasDivisao))</strong>/pessoa</span>
+                                    <button type="button" class="btn btn-sm btn-outline-light" @onclick="() => _valorPagamento = Formato.ValorEditavel(resumoAlvo.ValorPorPessoa(_pessoasDivisao))">Usar</button>
+                                </div>
+                            }
+                            @{ var pagamentos = (comandaFiltro is null ? _detalhe.Comandas.SelectMany(c => c.Pagamentos) : comandaFiltro.Pagamentos).OrderBy(p => p.DataHora).ToList(); }
+                            @if (pagamentos.Count > 0)
+                            {
+                                <div class="pagamentos">
+                                    @foreach (var pagamento in pagamentos)
+                                    {
+                                        <div>
+                                            <span>@Formato.Hora(pagamento.DataHora) @Formato.Meio(pagamento.Meio)@(pagamento.ValorTroco > 0 ? $" (troco {Formato.Moeda(pagamento.ValorTroco)})" : string.Empty)</span>
+                                            <span>
+                                                @Formato.Moeda(pagamento.ValorPago)
+                                                <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Estornar (PIN gerente)" @onclick="() => AbrirEstorno(pagamento)">estornar</button>
+                                            </span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="recebimento">
+                            @if (_detalhe.Status == StatusMesa.AguardandoLimpeza)
+                            {
+                                <p class="text-muted">Conta encerrada. Após a limpeza, libere a mesa.</p>
+                                <button type="button" class="btn btn-finalizar" @onclick="LiberarMesaAsync"><kbd>F10</kbd> Mesa limpa · Liberar</button>
+                            }
+                            else if (MesaAberta)
+                            {
+                                <div class="meios">
+                                    @foreach (var meio in Enum.GetValues<MeioPagamento>())
+                                    {
+                                        <button type="button" class="meio @(_meio == meio ? "ativo" : string.Empty)" @onclick="() => SelecionarMeio(meio)">@Formato.Meio(meio)</button>
+                                    }
+                                </div>
+                                <div class="valor-recebido">
+                                    <label for="valor-pagamento">@(_meio == MeioPagamento.Dinheiro ? "Valor recebido" : "Valor a pagar")</label>
+                                    <input id="valor-pagamento" class="form-control form-control-lg" inputmode="decimal" autocomplete="off"
+                                           @bind="_valorPagamento" @bind:event="oninput" @onkeydown="TeclaValorAsync" />
+                                </div>
+                                @if (_meio == MeioPagamento.Dinheiro && Formato.TentarLerValor(_valorPagamento, out var recebido) && recebido > resumoAlvo.Saldo && resumoAlvo.Saldo > 0)
+                                {
+                                    <div class="troco">Troco: <strong>@Formato.Moeda(recebido - resumoAlvo.Saldo)</strong></div>
+                                }
+                                <button type="button" class="btn btn-receber" disabled="@(_ocupado || resumoAlvo.Saldo <= 0 || !_indicadores.TurnoAberto)" @onclick="ReceberAsync">
+                                    <kbd>F9</kbd> Receber
+                                </button>
+                                <button type="button" class="btn btn-finalizar" disabled="@(_ocupado || _detalhe.Resumo.Saldo > 0)" @onclick="FinalizarMesaAsync">
+                                    <kbd>F10</kbd> Finalizar e Liberar Mesa
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </section>
+        </div>
+    </div>
+
+    @* ---------- Modais ---------- *@
+
+    <Modal Aberto="_modal == ModalCaixa.Lancar" Titulo="@($"Lançar itens · Mesa {_detalhe?.Numero} · {NomeComandaLancamento}")" Classe="modal-largo" OnFechar="FecharModal" FecharAoClicarFora="false">
+        <ChildContent>
+            <div class="lancamento">
+                <SeletorProdutos ComBusca="true" OnAdicionar="item => ItemCarrinho.Adicionar(_carrinho, item)" />
+                <div class="lancamento-carrinho">
+                    <h4>Itens a lançar</h4>
+                    @foreach (var item in _carrinho)
+                    {
+                        <div class="lancamento-item">
+                            <div class="nome">
+                                @item.Produto.Nome
+                                @if (!string.IsNullOrEmpty(item.Detalhes))
+                                {
+                                    <small>@item.Detalhes</small>
+                                }
+                            </div>
+                            <div class="stepper pequeno">
+                                <button type="button" @onclick="() => AlterarQuantidadeCarrinho(item, -1)">−</button>
+                                <strong>@Formato.Qtd(item.Quantidade)</strong>
+                                <button type="button" @onclick="() => AlterarQuantidadeCarrinho(item, 1)">+</button>
+                            </div>
+                            <div class="valor">@Formato.Moeda(item.Total)</div>
+                        </div>
+                    }
+                    @if (_carrinho.Count == 0)
+                    {
+                        <p class="text-muted">Clique nos produtos para adicionar.</p>
+                    }
+                    <div class="lancamento-total">Total: <strong>@Formato.Moeda(_carrinho.Sum(i => i.Total))</strong></div>
+                </div>
+            </div>
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModal">Cancelar (Esc)</button>
+            <button type="button" class="btn btn-lg btn-brasa flex-grow-1" disabled="@(_ocupado || _carrinho.Count == 0)" @onclick="LancarAsync">
+                Enviar Pedido para Produção
+            </button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_modal == ModalCaixa.TransferirMesa" Titulo="@($"Transferir clientes da mesa {_detalhe?.Numero} para…")" Classe="modal-largo" OnFechar="FecharModal">
+        <ChildContent>
+            <p class="text-muted">Mesas ocupadas: as contas serão juntadas. A mesa de origem ficará aguardando limpeza.</p>
+            <MapaMesas Mesas="_mesas" Compacto="true" Desabilitar="m => m.Id == _mesaId" OnSelecionar="m => TransferirMesaAsync(m.Id)" />
+        </ChildContent>
+    </Modal>
+
+    <Modal Aberto="_modal == ModalCaixa.TransferirItem" Titulo="Transferir item" OnFechar="FecharModal">
+        <ChildContent>
+            @if (ItemSelecionadoAtivo is { } item)
+            {
+                <p class="fs-5"><strong>@Formato.Qtd(item.Quantidade)× @item.Produto</strong> <span class="text-muted">@item.Observacoes</span></p>
+                <label class="form-label">Quantidade a transferir</label>
+                <div class="stepper mb-3">
+                    <button type="button" @onclick="() => _quantidadeAcao = Math.Max(1, _quantidadeAcao - 1)">−</button>
+                    <strong>@Formato.Qtd(_quantidadeAcao)</strong>
+                    <button type="button" @onclick="() => _quantidadeAcao = Math.Min(item.Quantidade, _quantidadeAcao + 1)">+</button>
+                </div>
+                <label class="form-label">Mesa de destino</label>
+                <select class="form-select form-select-lg mb-3" value="@_mesaDestinoId" @onchange="EscolherMesaDestinoAsync">
+                    @foreach (var mesa in _mesas)
+                    {
+                        <option value="@mesa.Id">Mesa @mesa.Numero — @Formato.Status(mesa.Status)</option>
+                    }
+                </select>
+                <label class="form-label">Comanda de destino</label>
+                <select class="form-select form-select-lg" @bind="_comandaDestinoId">
+                    <option value="0">Conta Geral</option>
+                    @foreach (var comanda in _comandasDestino.Where(c => !c.ContaGeral && c.Id != item.ComandaId))
+                    {
+                        <option value="@comanda.Id">@comanda.Descricao</option>
+                    }
+                </select>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModal">Cancelar</button>
+            <button type="button" class="btn btn-lg btn-brasa flex-grow-1" disabled="@_ocupado" @onclick="TransferirItemAsync">Transferir</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_modal == ModalCaixa.Cancelar" Titulo="Cancelar item · autorização do gerente" OnFechar="FecharModal">
+        <ChildContent>
+            @if (ItemSelecionadoAtivo is { } item)
+            {
+                <p class="fs-5"><strong>@Formato.Qtd(item.Quantidade)× @item.Produto</strong> <span class="text-muted">@item.Observacoes</span></p>
+                <label class="form-label">Quantidade a cancelar</label>
+                <div class="stepper mb-3">
+                    <button type="button" @onclick="() => _quantidadeAcao = Math.Max(1, _quantidadeAcao - 1)">−</button>
+                    <strong>@Formato.Qtd(_quantidadeAcao)</strong>
+                    <button type="button" @onclick="() => _quantidadeAcao = Math.Min(item.Quantidade, _quantidadeAcao + 1)">+</button>
+                </div>
+                <label class="form-label">Motivo</label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach (var motivo in MotivosCancelamento)
+                    {
+                        <button type="button" class="chip @(_motivo == motivo ? "ativo" : string.Empty)" @onclick="() => _motivo = motivo">@motivo</button>
+                    }
+                </div>
+                <input class="form-control mb-3" maxlength="250" placeholder="Outro motivo…" @bind="_motivo" />
+                <label class="form-label" for="pin-gerente">PIN do gerente</label>
+                <input id="pin-gerente" class="form-control form-control-lg pin-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off"
+                       @bind="_pinGerente" @onkeydown='e => e.Key == "Enter" ? CancelarItemAsync() : Task.CompletedTask' />
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModal">Voltar</button>
+            <button type="button" class="btn btn-lg btn-danger flex-grow-1" disabled="@_ocupado" @onclick="CancelarItemAsync">Confirmar cancelamento</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_modal == ModalCaixa.Estorno" Titulo="Estornar pagamento · autorização do gerente" OnFechar="FecharModal">
+        <ChildContent>
+            @if (_pagamentoEstorno is { } pagamento)
+            {
+                <p class="fs-5">@Formato.Meio(pagamento.Meio) de <strong>@Formato.Moeda(pagamento.ValorPago)</strong> às @Formato.Hora(pagamento.DataHora)</p>
+                <label class="form-label">Motivo</label>
+                <input class="form-control mb-3" maxlength="250" placeholder="Ex.: lançado na mesa errada" @bind="_motivo" />
+                <label class="form-label" for="pin-estorno">PIN do gerente</label>
+                <input id="pin-estorno" class="form-control form-control-lg pin-input" type="password" inputmode="numeric" maxlength="4" autocomplete="off" @bind="_pinGerente" />
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModal">Voltar</button>
+            <button type="button" class="btn btn-lg btn-danger flex-grow-1" disabled="@_ocupado" @onclick="EstornarAsync">Estornar</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_modal == ModalCaixa.NovaComanda" Titulo="@($"Nova comanda · Mesa {_detalhe?.Numero}")" OnFechar="FecharModal">
+        <ChildContent>
+            <label class="form-label">Número do cartão (vazio = próximo livre)</label>
+            <input id="codigo-comanda" class="form-control form-control-lg mb-3" inputmode="numeric" @bind="_codigoComanda" placeholder="Ex.: 105" />
+            <label class="form-label">Nome do cliente (opcional)</label>
+            <input class="form-control form-control-lg" maxlength="60" @bind="_nomeComanda"
+                   @onkeydown='e => e.Key == "Enter" ? CriarComandaAsync() : Task.CompletedTask' />
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModal">Cancelar</button>
+            <button type="button" class="btn btn-lg btn-brasa flex-grow-1" disabled="@_ocupado" @onclick="CriarComandaAsync">Criar comanda</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_modal == ModalCaixa.QrCode" Titulo="Conectar celulares dos garçons" OnFechar="FecharModal">
+        <ChildContent>
+            <div class="qr-code">
+                <p>Conecte o celular no <strong>mesmo Wi-Fi</strong> do caixa e aponte a câmera:</p>
+                <img src="@_qrCode" alt="QR Code de acesso" />
+                <div class="qr-url">@_urlGarcom</div>
+                @if (_ips.Count > 1)
+                {
+                    <div class="mt-2">
+                        <span class="text-muted small">Outras redes deste PC:</span>
+                        @foreach (var ip in _ips)
+                        {
+                            <button type="button" class="chip @(_urlGarcom.Contains(ip) ? "ativo" : string.Empty)" @onclick="() => GerarQrCode(ip)">@ip</button>
+                        }
+                    </div>
+                }
+                <p class="text-muted small mt-3">Se não abrir, libere a porta @Rede.Porta no Firewall do Windows (veja o README).</p>
+            </div>
+        </ChildContent>
+    </Modal>
+
+    <Modal Aberto="_ajuda" Titulo="Atalhos do caixa" OnFechar="() => _ajuda = false">
+        <ChildContent>
+            <TabelaAtalhos />
+        </ChildContent>
+    </Modal>
+</AreaProtegida>
+
+@code {
+    private enum ModalCaixa { Nenhum, Lancar, TransferirMesa, TransferirItem, Cancelar, Estorno, NovaComanda, QrCode }
+
+    private static readonly PerfilUsuario[] PerfisCaixa = [PerfilUsuario.OperadorCaixa, PerfilUsuario.Gerente];
+    private static readonly string[] MotivosCancelamento = ["Cliente desistiu", "Erro de digitação", "Demora no preparo", "Produto em falta", "Cortesia"];
+
+    private AreaProtegida _area = null!;
+    private UsuarioLogado? _usuario;
+    private DotNetObjectReference<Caixa>? _referencia;
+
+    private IndicadoresCaixa _indicadores = new(0, 0, 0, 0, false);
+    private List<MesaResumo> _mesas = [];
+    private int? _mesaId;
+    private MesaDetalhe? _detalhe;
+    private int? _comandaId;
+    private int? _itemId;
+    private string _digitandoMesa = string.Empty;
+    private int _pessoasAbertura = 2;
+    private int _pessoasDivisao = 1;
+
+    private MeioPagamento _meio = MeioPagamento.Dinheiro;
+    private string? _valorPagamento;
+
+    private ModalCaixa _modal = ModalCaixa.Nenhum;
+    private bool _ajuda;
+    private bool _menuAberto;
+    private readonly List<ItemCarrinho> _carrinho = [];
+    private decimal _quantidadeAcao = 1;
+    private string? _motivo;
+    private string? _pinGerente;
+    private int _mesaDestinoId;
+    private int _comandaDestinoId;
+    private List<ComandaDetalhe> _comandasDestino = [];
+    private PagamentoRealizado? _pagamentoEstorno;
+    private string? _codigoComanda;
+    private string? _nomeComanda;
+    private List<string> _ips = [];
+    private string _urlGarcom = string.Empty;
+    private string? _qrCode;
+
+    private bool _ocupado;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private bool MesaAberta => _detalhe?.Status is StatusMesa.Ocupada or StatusMesa.ContaSolicitada;
+
+    private ComandaDetalhe? ComandaSelecionada => _comandaId is null ? null : _detalhe?.Comandas.FirstOrDefault(c => c.Id == _comandaId);
+
+    private IEnumerable<ItemConsumo> ItensVisiveis => _detalhe is null
+        ? []
+        : ComandaSelecionada?.Itens ?? _detalhe.Itens;
+
+    private ItemConsumo? ItemSelecionado => ItensVisiveis.FirstOrDefault(i => i.Id == _itemId);
+
+    private ItemConsumo? ItemSelecionadoAtivo => ItemSelecionado is { Cancelado: false } item ? item : null;
+
+    private bool TaxaAtiva => ComandaSelecionada?.CobrarTaxaServico ?? _detalhe?.Comandas.Any(c => c.CobrarTaxaServico) ?? true;
+
+    private string NomeComandaLancamento => ComandaSelecionada?.Descricao ?? "Conta Geral";
+
+    private async Task AoEntrarAsync(UsuarioLogado usuario)
+    {
+        _usuario = usuario;
+        await RecarregarTudoAsync();
+        _referencia ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("pdv.registrarAtalhos", _referencia);
+    }
+
+    protected override async Task AoAlterarMesasAsync(int? mesaId)
+    {
+        if (_usuario is null)
+        {
+            return;
+        }
+
+        _mesas = await MesaService.ListarMapaAsync();
+        _indicadores = await CaixaService.ObterIndicadoresAsync();
+        if (_mesaId is { } atual && (mesaId is null || mesaId == atual))
+        {
+            await RecarregarDetalheAsync(manterValor: true);
+        }
+    }
+
+    private async Task RecarregarTudoAsync()
+    {
+        _mesas = await MesaService.ListarMapaAsync();
+        _indicadores = await CaixaService.ObterIndicadoresAsync();
+        await RecarregarDetalheAsync(manterValor: false);
+    }
+
+    private async Task RecarregarDetalheAsync(bool manterValor)
+    {
+        if (_mesaId is not { } id)
+        {
+            _detalhe = null;
+            return;
+        }
+
+        _detalhe = await MesaService.ObterDetalheAsync(id);
+        if (_comandaId is { } comanda && _detalhe.Comandas.All(c => c.Id != comanda))
+        {
+            _comandaId = null;
+        }
+
+        if (_itemId is { } item && !_detalhe.Itens.Any(i => i.Id == item))
+        {
+            _itemId = null;
+        }
+
+        if (!manterValor)
+        {
+            PreencherValorPagamento();
+        }
+    }
+
+    private void PreencherValorPagamento()
+    {
+        var saldo = (ComandaSelecionada?.Resumo ?? _detalhe?.Resumo)?.Saldo ?? 0;
+        _valorPagamento = saldo > 0 ? Formato.ValorEditavel(saldo) : null;
+    }
+
+    private async Task SelecionarMesaAsync(int mesaId)
+    {
+        if (_mesaId != mesaId)
+        {
+            _comandaId = null;
+            _itemId = null;
+            _meio = MeioPagamento.Dinheiro;
+        }
+
+        _mesaId = mesaId;
+        await RecarregarDetalheAsync(manterValor: false);
+        _pessoasDivisao = _detalhe?.PessoasParaDivisao ?? 1;
+        _pessoasAbertura = Math.Max(1, Math.Min(_detalhe?.CapacidadeLugares ?? 2, 4));
+    }
+
+    private void SelecionarComanda(int? comandaId)
+    {
+        _comandaId = comandaId;
+        _itemId = null;
+        _pessoasDivisao = comandaId is null ? _detalhe?.PessoasParaDivisao ?? 1 : 1;
+        PreencherValorPagamento();
+    }
+
+    private void SelecionarItem(ItemConsumo item) => _itemId = _itemId == item.Id ? null : item.Id;
+
+    private void SelecionarMeio(MeioPagamento meio)
+    {
+        _meio = meio;
+        _ = JS.InvokeVoidAsync("pdv.focar", "valor-pagamento", true);
+    }
+
+    // ---------- Atalhos de teclado ----------
+
+    [JSInvokable]
+    public async Task TeclaAtalho(string tecla)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (tecla == "Escape")
+            {
+                if (_modal != ModalCaixa.Nenhum || _ajuda)
+                {
+                    FecharModal();
+                }
+                else if (_digitandoMesa.Length > 0)
+                {
+                    _digitandoMesa = string.Empty;
+                }
+                else
+                {
+                    _itemId = null;
+                }
+
+                StateHasChanged();
+                return;
+            }
+
+            if (_modal != ModalCaixa.Nenhum)
+            {
+                return;
+            }
+
+            switch (tecla)
+            {
+                case "F1": _ajuda = !_ajuda; break;
+                case "F2": AbrirLancamento(); break;
+                case "F3": if (MesaAberta) AbrirTransferirMesa(); break;
+                case "F4": if (ItemSelecionadoAtivo is not null) await AbrirTransferirItemAsync(); break;
+                case "F5": await RecarregarTudoAsync(); Avisar("Atualizado.", "info"); break;
+                case "F6": if (_detalhe?.TemConsumo == true) await ImprimirPreContaAsync(); break;
+                case "F7": if (_detalhe?.Comandas.Count > 0) await AlternarTaxaAsync(); break;
+                case "F8": if (ItemSelecionadoAtivo is not null) AbrirCancelamento(); break;
+                case "F9":
+                    if (MesaAberta && Formato.TentarLerValor(_valorPagamento, out _)) await ReceberAsync();
+                    else await JS.InvokeVoidAsync("pdv.focar", "valor-pagamento", true);
+                    break;
+                case "F10":
+                    if (_detalhe?.Status == StatusMesa.AguardandoLimpeza) await LiberarMesaAsync();
+                    else if (MesaAberta && _detalhe!.Resumo.Saldo <= 0) await FinalizarMesaAsync();
+                    break;
+                case "F11": AbrirQrCode(); break;
+                case "F12": AbrirNovaComanda(); break;
+                case "Backspace":
+                    if (_digitandoMesa.Length > 0) _digitandoMesa = _digitandoMesa[..^1];
+                    break;
+                case "Enter":
+                    if (_digitandoMesa.Length > 0 && int.TryParse(_digitandoMesa, out var numero))
+                    {
+                        _digitandoMesa = string.Empty;
+                        var mesa = _mesas.FirstOrDefault(m => m.Numero == numero);
+                        if (mesa is null) Avisar($"Mesa {numero} não existe.", "erro");
+                        else await SelecionarMesaAsync(mesa.Id);
+                    }
+                    break;
+                default:
+                    if (tecla.Length == 1 && char.IsAsciiDigit(tecla[0]) && _digitandoMesa.Length < 3)
+                    {
+                        _digitandoMesa += tecla;
+                    }
+                    break;
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task TeclaValorAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ReceberAsync();
+        }
+    }
+
+    // ---------- Ações da mesa ----------
+
+    private async Task AbrirMesaAsync()
+    {
+        if (_detalhe is null) return;
+        await ExecutarAsync(() => MesaService.AbrirMesaAsync(_detalhe.Id, _pessoasAbertura), $"Mesa {_detalhe.Numero} aberta.");
+    }
+
+    private async Task AlterarPessoasAsync(int delta)
+    {
+        if (_detalhe is null) return;
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.DefinirPessoasAsync(_detalhe.Id, Math.Max(1, _detalhe.QuantidadePessoas + delta));
+            await RecarregarDetalheAsync(manterValor: true);
+            _pessoasDivisao = _detalhe.PessoasParaDivisao;
+        });
+    }
+
+    private void AbrirLancamento()
+    {
+        if (_detalhe is null)
+        {
+            Avisar("Selecione uma mesa primeiro.", "erro");
+            return;
+        }
+
+        _carrinho.Clear();
+        _modal = ModalCaixa.Lancar;
+        _ = JS.InvokeVoidAsync("pdv.focar", "busca-produto", false);
+    }
+
+    private void AlterarQuantidadeCarrinho(ItemCarrinho item, int delta)
+    {
+        item.Quantidade += delta;
+        if (item.Quantidade <= 0)
+        {
+            _carrinho.Remove(item);
+        }
+    }
+
+    private async Task LancarAsync()
+    {
+        if (_detalhe is null || _usuario is null || _carrinho.Count == 0) return;
+        await ExecutarAsync(async () =>
+        {
+            var resultado = await PedidoService.LancarPedidoAsync(new NovoPedido(
+                _detalhe.Id, ComandaSelecionada?.Id, _usuario.Id, _carrinho.Select(i => i.ParaPedido()).ToList()));
+            _carrinho.Clear();
+            _modal = ModalCaixa.Nenhum;
+            await RecarregarTudoAsync();
+            if (!resultado.ImpressoComSucesso)
+            {
+                throw new RegraNegocioException($"Pedido lançado, mas falhou a impressão em: {string.Join(", ", resultado.SetoresComFalha.Select(Formato.Setor))}. Use \"Reimprimir Pedido\".");
+            }
+        }, "Pedido lançado e enviado para a produção.");
+    }
+
+    private void AbrirTransferirMesa() => _modal = ModalCaixa.TransferirMesa;
+
+    private async Task TransferirMesaAsync(int destinoId)
+    {
+        if (_detalhe is null) return;
+        var origem = _detalhe.Numero;
+        var destino = _mesas.First(m => m.Id == destinoId).Numero;
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.TransferirMesaAsync(_detalhe.Id, destinoId);
+            _modal = ModalCaixa.Nenhum;
+            _mesaId = destinoId;
+            _comandaId = null;
+            await RecarregarTudoAsync();
+        }, $"Clientes transferidos da mesa {origem} para a mesa {destino}.");
+    }
+
+    private void AbrirTransferirItem() => _ = AbrirTransferirItemAsync();
+
+    private async Task AbrirTransferirItemAsync()
+    {
+        if (ItemSelecionadoAtivo is not { } item || _detalhe is null) return;
+        _quantidadeAcao = item.Quantidade;
+        _mesaDestinoId = _detalhe.Id;
+        _comandaDestinoId = 0;
+        _comandasDestino = _detalhe.Comandas.ToList();
+        _modal = ModalCaixa.TransferirItem;
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task EscolherMesaDestinoAsync(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var mesaId)) return;
+        _mesaDestinoId = mesaId;
+        _comandaDestinoId = 0;
+        _comandasDestino = (await MesaService.ObterDetalheAsync(mesaId)).Comandas.ToList();
+    }
+
+    private async Task TransferirItemAsync()
+    {
+        if (ItemSelecionadoAtivo is not { } item) return;
+        await ExecutarAsync(async () =>
+        {
+            await PedidoService.TransferirItemAsync(item.Id, _quantidadeAcao, _mesaDestinoId, _comandaDestinoId == 0 ? null : _comandaDestinoId);
+            _modal = ModalCaixa.Nenhum;
+            _itemId = null;
+            await RecarregarTudoAsync();
+        }, "Item transferido.");
+    }
+
+    private void AbrirCancelamento()
+    {
+        if (ItemSelecionadoAtivo is not { } item) return;
+        _quantidadeAcao = item.Quantidade;
+        _motivo = null;
+        _pinGerente = null;
+        _modal = ModalCaixa.Cancelar;
+    }
+
+    private async Task CancelarItemAsync()
+    {
+        if (ItemSelecionadoAtivo is not { } item) return;
+        await ExecutarAsync(async () =>
+        {
+            await PedidoService.CancelarItemAsync(item.Id, _quantidadeAcao, _pinGerente, _motivo);
+            _modal = ModalCaixa.Nenhum;
+            _itemId = null;
+            await RecarregarTudoAsync();
+        }, "Item cancelado.");
+        _pinGerente = null;
+    }
+
+    private async Task ReimprimirPedidoAsync()
+    {
+        if (ItemSelecionado is not { } item) return;
+        await ExecutarAsync(async () =>
+        {
+            var resultado = await PedidoService.ReimprimirPedidoAsync(item.PedidoId);
+            await RecarregarDetalheAsync(manterValor: true);
+            if (!resultado.ImpressoComSucesso)
+            {
+                throw new RegraNegocioException($"Falha ao reimprimir em: {string.Join(", ", resultado.SetoresComFalha.Select(Formato.Setor))}.");
+            }
+
+            if (resultado.SetoresImpressos.Count == 0)
+            {
+                throw new RegraNegocioException("Este pedido não tem itens que vão para a produção.");
+            }
+        }, "Pedido reimpresso.");
+    }
+
+    private async Task ImprimirPreContaAsync()
+    {
+        if (_detalhe is null) return;
+        await ExecutarAsync(async () =>
+        {
+            var impresso = await MesaService.SolicitarContaAsync(_detalhe.Id);
+            if (!impresso)
+            {
+                throw new RegraNegocioException("Mesa marcada como conta pedida, mas a impressora do caixa falhou.");
+            }
+        }, "Pré-conta impressa.");
+    }
+
+    private async Task AlternarTaxaAsync()
+    {
+        if (_detalhe is null) return;
+        var cobrar = !TaxaAtiva;
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.DefinirTaxaServicoAsync(_detalhe.Id, ComandaSelecionada?.Id, cobrar);
+            await RecarregarDetalheAsync(manterValor: false);
+        }, cobrar ? "Taxa de serviço ativada." : "Taxa de serviço removida.");
+    }
+
+    private void AbrirNovaComanda()
+    {
+        if (_detalhe is null)
+        {
+            Avisar("Selecione uma mesa primeiro.", "erro");
+            return;
+        }
+
+        _codigoComanda = null;
+        _nomeComanda = null;
+        _modal = ModalCaixa.NovaComanda;
+        _ = JS.InvokeVoidAsync("pdv.focar", "codigo-comanda", false);
+    }
+
+    private async Task CriarComandaAsync()
+    {
+        if (_detalhe is null) return;
+        int? codigo = null;
+        if (!string.IsNullOrWhiteSpace(_codigoComanda))
+        {
+            if (!int.TryParse(_codigoComanda, out var numero))
+            {
+                Avisar("Número de comanda inválido.", "erro");
+                return;
+            }
+
+            codigo = numero;
+        }
+
+        await ExecutarAsync(async () =>
+        {
+            var id = await MesaService.CriarComandaAsync(_detalhe.Id, codigo, _nomeComanda);
+            _modal = ModalCaixa.Nenhum;
+            await RecarregarTudoAsync();
+            SelecionarComanda(id);
+        }, "Comanda criada.");
+    }
+
+    // ---------- Recebimento ----------
+
+    private async Task ReceberAsync()
+    {
+        if (_detalhe is null || _usuario is null) return;
+        if (!Formato.TentarLerValor(_valorPagamento, out var valor) || valor <= 0)
+        {
+            Avisar("Informe um valor válido.", "erro");
+            return;
+        }
+
+        var meio = _meio;
+        ResultadoPagamento? resultado = null;
+        await ExecutarAsync(async () =>
+        {
+            resultado = await PagamentoService.RegistrarAsync(new NovoPagamento(_detalhe.Id, ComandaSelecionada?.Id, meio, valor, _usuario.Id));
+            await RecarregarTudoAsync();
+        });
+
+        if (resultado is null) return;
+
+        var mensagem = $"Recebido {Formato.Moeda(resultado.ValorAbatido)} em {Formato.Meio(meio)}.";
+        if (resultado.Troco > 0) mensagem += $" TROCO: {Formato.Moeda(resultado.Troco)}.";
+        mensagem += resultado.MesaFinalizada ? " Conta quitada — mesa liberada para limpeza." : $" Saldo da mesa: {Formato.Moeda(resultado.SaldoRestanteMesa)}.";
+        Avisar(mensagem, "sucesso", resultado.Troco > 0 ? 12000 : 5000);
+    }
+
+    private void AbrirEstorno(PagamentoRealizado pagamento)
+    {
+        _pagamentoEstorno = pagamento;
+        _motivo = null;
+        _pinGerente = null;
+        _modal = ModalCaixa.Estorno;
+    }
+
+    private async Task EstornarAsync()
+    {
+        if (_pagamentoEstorno is null) return;
+        await ExecutarAsync(async () =>
+        {
+            await PagamentoService.EstornarAsync(_pagamentoEstorno.Id, _pinGerente, _motivo);
+            _modal = ModalCaixa.Nenhum;
+            await RecarregarTudoAsync();
+        }, "Pagamento estornado.");
+        _pinGerente = null;
+    }
+
+    private async Task FinalizarMesaAsync()
+    {
+        if (_detalhe is null) return;
+        var numero = _detalhe.Numero;
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.FinalizarMesaAsync(_detalhe.Id, _usuario?.Id);
+            await RecarregarTudoAsync();
+        }, $"Mesa {numero} finalizada.");
+    }
+
+    private async Task LiberarMesaAsync()
+    {
+        if (_detalhe is null) return;
+        var numero = _detalhe.Numero;
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.LiberarMesaAsync(_detalhe.Id);
+            await RecarregarTudoAsync();
+        }, $"Mesa {numero} livre.");
+    }
+
+    // ---------- Diversos ----------
+
+    private void AbrirQrCode()
+    {
+        _ips = Rede.ObterIpsLocais().ToList();
+        GerarQrCode(_ips[0]);
+        _modal = ModalCaixa.QrCode;
+    }
+
+    private void GerarQrCode(string ip)
+    {
+        _urlGarcom = Rede.ObterUrlGarcom(ip);
+        _qrCode = Rede.GerarQrCodeDataUri(_urlGarcom);
+    }
+
+    private void FecharModal()
+    {
+        _modal = ModalCaixa.Nenhum;
+        _ajuda = false;
+        _pinGerente = null;
+    }
+
+    private async Task SairAsync()
+    {
+        await JS.InvokeVoidAsync("pdv.removerAtalhos");
+        _usuario = null;
+        _mesaId = null;
+        _detalhe = null;
+        await _area.SairAsync();
+    }
+
+    private async Task ExecutarAsync(Func<Task> acao, string? sucesso = null)
+    {
+        if (_ocupado) return;
+        _ocupado = true;
+        try
+        {
+            await acao();
+            if (sucesso is not null) Avisar(sucesso, "sucesso");
+        }
+        catch (RegraNegocioException ex)
+        {
+            Avisar(ex.Message, "erro");
+        }
+        catch (Exception ex) when (ex is Microsoft.EntityFrameworkCore.DbUpdateException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            // Outro terminal gravou a mesma mesa no mesmo instante: os dados na tela podem estar desatualizados.
+            Avisar("Outro terminal alterou esta mesa ao mesmo tempo. Confira e tente novamente.", "erro");
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void Avisar(string mensagem, string tipo, int? duracaoMs = null)
+    {
+        _aviso = mensagem;
+        _tipoAviso = tipo;
+        var atual = mensagem;
+        _ = Task.Delay(duracaoMs ?? (tipo == "erro" ? 7000 : 3500)).ContinueWith(_ => InvokeAsync(() =>
+        {
+            if (_aviso == atual)
+            {
+                _aviso = null;
+                StateHasChanged();
+            }
+        }));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("pdv.removerAtalhos");
+        }
+        catch (JSDisconnectedException)
+        {
+            // Navegador já desconectado.
+        }
+
+        _referencia?.Dispose();
+        base.Dispose();
+    }
+}

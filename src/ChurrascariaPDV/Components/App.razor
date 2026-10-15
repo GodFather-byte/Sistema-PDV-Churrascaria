@@ -1,20 +1,28 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="pt-BR">
 
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#16110e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <base href="/" />
     <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="ChurrascariaPDV.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="RenderModeSemPreRender" />
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="RenderModeSemPreRender" />
     <script src="_framework/blazor.web.js"></script>
+    <script src="js/pdv.js"></script>
 </body>
 
 </html>
+
+@code {
+    // Sem pré-renderização: as telas dependem do login guardado no navegador.
+    private static readonly IComponentRenderMode RenderModeSemPreRender = new InteractiveServerRenderMode(prerender: false);
+}

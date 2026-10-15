@@ -9,6 +9,7 @@ public class Mesa
     public int CapacidadeLugares { get; set; }
     public StatusMesa Status { get; set; } = StatusMesa.Livre;
     public DateTime? DataHoraAbertura { get; set; }
+    public int QuantidadePessoas { get; set; }
     public decimal ValorTotalAtual { get; set; }
     public ICollection<Comanda> Comandas { get; set; } = new List<Comanda>();
     public ICollection<Pedido> Pedidos { get; set; } = new List<Pedido>();

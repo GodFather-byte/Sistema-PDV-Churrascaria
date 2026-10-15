@@ -1,0 +1,36 @@
+<table class="table table-dark table-sm resumo-turno">
+    <tbody>
+        <tr class="secao"><td colspan="2">Recebimentos</td></tr>
+        @foreach (var meio in Resumo.PorMeio)
+        {
+            <tr><td>@Formato.Meio(meio.Meio) <span class="text-muted">(@meio.Quantidade)</span></td><td class="text-end">@Formato.Moeda(meio.Valor)</td></tr>
+        }
+        <tr class="destaque"><td>Total recebido</td><td class="text-end">@Formato.Moeda(Resumo.TotalRecebido)</td></tr>
+        <tr><td class="text-muted">dos quais serviço 10%</td><td class="text-end text-muted">@Formato.Moeda(Resumo.TotalTaxaServico)</td></tr>
+        <tr class="secao"><td colspan="2">Gaveta (dinheiro)</td></tr>
+        <tr><td>Fundo de troco</td><td class="text-end">@Formato.Moeda(Resumo.FundoTroco)</td></tr>
+        <tr><td>Vendas em dinheiro</td><td class="text-end">@Formato.Moeda(Resumo.TotalDinheiro)</td></tr>
+        <tr><td>Suprimentos</td><td class="text-end">@Formato.Moeda(Resumo.TotalSuprimentos)</td></tr>
+        <tr><td>Sangrias</td><td class="text-end">− @Formato.Moeda(Resumo.TotalSangrias)</td></tr>
+        <tr class="destaque"><td>Esperado na gaveta</td><td class="text-end">@Formato.Moeda(Resumo.DinheiroEsperado)</td></tr>
+        @if (Resumo.DinheiroInformado is { } contado)
+        {
+            <tr><td>Contado</td><td class="text-end">@Formato.Moeda(contado)</td></tr>
+            <tr class="destaque"><td>Diferença</td><td class="text-end">@Formato.Moeda(contado - Resumo.DinheiroEsperado)</td></tr>
+        }
+        <tr class="secao"><td colspan="2">Operação</td></tr>
+        <tr><td>Contas fechadas</td><td class="text-end">@Resumo.MesasFechadas</td></tr>
+        <tr><td>Itens cancelados</td><td class="text-end">@Resumo.ItensCancelados</td></tr>
+        @foreach (var movimentacao in Resumo.Movimentacoes)
+        {
+            <tr>
+                <td class="text-muted">@Formato.Hora(movimentacao.DataHora) @movimentacao.Tipo · @movimentacao.Observacao (@movimentacao.Usuario)</td>
+                <td class="text-end text-muted">@(movimentacao.Tipo == TipoMovimentacaoCaixa.Sangria ? "− " : "+ ")@Formato.Moeda(movimentacao.Valor)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public ResumoTurno Resumo { get; set; } = null!;
+}

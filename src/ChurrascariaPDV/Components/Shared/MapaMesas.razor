@@ -1,0 +1,33 @@
+<div class="mapa-mesas @(Compacto ? "compacto" : string.Empty)">
+    @foreach (var mesa in Mesas)
+    {
+        var desabilitada = Desabilitar?.Invoke(mesa) ?? false;
+        <button type="button"
+                class="mesa mesa-@Formato.ClasseStatus(mesa.Status) @(mesa.Id == SelecionadaId ? "selecionada" : string.Empty)"
+                disabled="@desabilitada"
+                @onclick="() => OnSelecionar.InvokeAsync(mesa)">
+            <span class="mesa-numero">@mesa.Numero</span>
+            @switch (mesa.Status)
+            {
+                case StatusMesa.Livre:
+                    <span class="mesa-info">@mesa.CapacidadeLugares lug.</span>
+                    break;
+                case StatusMesa.AguardandoLimpeza:
+                    <span class="mesa-info">limpeza</span>
+                    break;
+                default:
+                    <span class="mesa-info">@Formato.Duracao(mesa.DataHoraAbertura)@(mesa.QuantidadeComandas > 0 ? $" · {mesa.QuantidadeComandas}c" : string.Empty)</span>
+                    <span class="mesa-valor">@Formato.Moeda(mesa.Valor)</span>
+                    break;
+            }
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<MesaResumo> Mesas { get; set; } = [];
+    [Parameter] public int? SelecionadaId { get; set; }
+    [Parameter] public bool Compacto { get; set; }
+    [Parameter] public Func<MesaResumo, bool>? Desabilitar { get; set; }
+    [Parameter] public EventCallback<MesaResumo> OnSelecionar { get; set; }
+}

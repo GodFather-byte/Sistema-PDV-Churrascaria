@@ -1,7 +1,52 @@
-﻿@page "/"
+@page "/"
+@inject RedeLocalService Rede
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Churrascaria PDV</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="home">
+    <h1>🔥 Churrascaria PDV</h1>
+    <p class="text-muted">Sistema local de ponto de venda e controle de mesas.</p>
 
-Welcome to your new app.
+    <div class="home-cartoes">
+        <a class="home-cartao" href="caixa">
+            <span class="icone">🖥️</span>
+            <strong>Caixa</strong>
+            <span>Mapa de mesas, recebimento e fechamento. Use em tela cheia no PC do caixa.</span>
+        </a>
+        <a class="home-cartao" href="garcom">
+            <span class="icone">📱</span>
+            <strong>Garçom</strong>
+            <span>Lançamento de pedidos pelo celular, na rede Wi-Fi do restaurante.</span>
+        </a>
+        <a class="home-cartao" href="caixa/turno">
+            <span class="icone">💰</span>
+            <strong>Turno de caixa</strong>
+            <span>Abertura com fundo de troco, sangria, suprimento e fechamento do dia.</span>
+        </a>
+        <a class="home-cartao" href="relatorios">
+            <span class="icone">📊</span>
+            <strong>Relatórios</strong>
+            <span>Vendas por forma de pagamento, produto, garçom e cancelamentos.</span>
+        </a>
+    </div>
+
+    <div class="home-qr">
+        <img src="@_qrCode" alt="QR Code para garçons" />
+        <div>
+            <h2>Celulares dos garçons</h2>
+            <p>Conecte no mesmo Wi-Fi e aponte a câmera para o QR Code, ou digite:</p>
+            <div class="qr-url">@_url</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _url = string.Empty;
+    private string? _qrCode;
+
+    protected override void OnInitialized()
+    {
+        _url = Rede.ObterUrlGarcom();
+        _qrCode = Rede.GerarQrCodeDataUri(_url);
+    }
+}

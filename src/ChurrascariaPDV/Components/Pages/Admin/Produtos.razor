@@ -1,0 +1,265 @@
+@page "/admin/produtos"
+@inject CardapioService CardapioService
+
+<PageTitle>Cardápio</PageTitle>
+
+<AreaProtegida Area="gerencia" Titulo="Cardápio (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => CarregarAsync()">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Cardápio</h1>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-light" @onclick="() => EditarCategoria(null)">+ Categoria</button>
+            <button type="button" class="btn btn-outline-light" @onclick="() => EditarGrupo(null)">+ Grupo de opções</button>
+            <button type="button" class="btn btn-brasa" @onclick="() => EditarProduto(null)">+ Produto</button>
+        </div>
+    </div>
+
+    <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+    <div class="painel mb-3">
+        <h2>Produtos</h2>
+        <table class="table table-dark table-hover table-sm align-middle">
+            <thead><tr><th>Produto</th><th>Categoria</th><th>Tipo</th><th>Setor de impressão</th><th>Opções</th><th class="text-end">Preço</th><th>Ativo</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var produto in _produtos)
+                {
+                    <tr class="@(produto.Ativo ? string.Empty : "text-muted")">
+                        <td>@produto.Nome</td>
+                        <td>@produto.Categoria.Nome</td>
+                        <td>@Formato.TipoItem(produto.TipoItem)</td>
+                        <td>@Formato.Setor(produto.SetorImpressao)</td>
+                        <td>@string.Join(", ", produto.GruposModificadores.Select(g => _grupos.FirstOrDefault(x => x.Id == g.GrupoModificadorId)?.Nome))</td>
+                        <td class="text-end">@Formato.Moeda(produto.Preco)</td>
+                        <td>@(produto.Ativo ? "Sim" : "Não")</td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-light" @onclick="() => EditarProduto(produto)">Editar</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="relatorio-grade">
+        <div class="painel">
+            <h2>Categorias</h2>
+            <ul class="lista-simples">
+                @foreach (var categoria in _categorias)
+                {
+                    <li><span>@categoria.Nome</span><button type="button" class="btn btn-sm btn-link" @onclick="() => EditarCategoria(categoria)">editar</button></li>
+                }
+            </ul>
+        </div>
+        <div class="painel">
+            <h2>Grupos de opções (modificadores)</h2>
+            <ul class="lista-simples">
+                @foreach (var grupo in _grupos)
+                {
+                    <li>
+                        <span>
+                            <strong>@grupo.Nome</strong>
+                            @(grupo.Obrigatorio ? " · obrigatório" : string.Empty)@(grupo.SelecaoUnica ? " · escolha única" : " · múltipla")
+                            <small class="d-block text-muted">@string.Join(", ", grupo.Opcoes.Select(o => o.Nome))</small>
+                        </span>
+                        <button type="button" class="btn btn-sm btn-link" @onclick="() => EditarGrupo(grupo)">editar</button>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <Modal Aberto="_produto is not null" Titulo="@(_produto?.Id == 0 ? "Novo produto" : "Editar produto")" OnFechar="() => _produto = null">
+        <ChildContent>
+            @if (_produto is not null)
+            {
+                <label class="form-label">Nome</label>
+                <input class="form-control mb-2" maxlength="100" @bind="_produto.Nome" />
+                <div class="row g-2 mb-2">
+                    <div class="col">
+                        <label class="form-label">Preço (R$)</label>
+                        <input class="form-control" inputmode="decimal" @bind="_precoProduto" />
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Categoria</label>
+                        <select class="form-select" @bind="_produto.CategoriaId">
+                            @foreach (var categoria in _categorias)
+                            {
+                                <option value="@categoria.Id">@categoria.Nome</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-2 mb-2">
+                    <div class="col">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-select" @bind="_produto.TipoItem">
+                            @foreach (var tipo in Enum.GetValues<TipoItem>())
+                            {
+                                <option value="@tipo">@Formato.TipoItem(tipo)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Imprimir em</label>
+                        <select class="form-select" @bind="_produto.SetorImpressao" disabled="@(_produto.TipoItem == TipoItem.Rodizio)">
+                            @foreach (var setor in Enum.GetValues<SetorImpressao>().Where(s => s != SetorImpressao.Caixa))
+                            {
+                                <option value="@setor">@Formato.Setor(setor)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                @if (_produto.TipoItem == TipoItem.Rodizio)
+                {
+                    <p class="text-muted small">Rodízio não imprime na produção: vai direto para a conta da mesa.</p>
+                }
+                <label class="form-label">Grupos de opções</label>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    @foreach (var grupo in _grupos)
+                    {
+                        <button type="button" class="chip @(_gruposProduto.Contains(grupo.Id) ? "ativo" : string.Empty)"
+                                @onclick="() => { if (!_gruposProduto.Remove(grupo.Id)) _gruposProduto.Add(grupo.Id); }">
+                            @grupo.Nome
+                        </button>
+                    }
+                </div>
+                <div class="form-check">
+                    <input id="produto-ativo" class="form-check-input" type="checkbox" @bind="_produto.Ativo" />
+                    <label class="form-check-label" for="produto-ativo">Ativo (aparece no cardápio)</label>
+                </div>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-secondary" @onclick="() => _produto = null">Cancelar</button>
+            <button type="button" class="btn btn-brasa flex-grow-1" @onclick="SalvarProdutoAsync">Salvar</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_categoriaEditando is not null" Titulo="Categoria" OnFechar="() => _categoriaEditando = null">
+        <ChildContent>
+            <label class="form-label">Nome</label>
+            <input class="form-control" maxlength="60" @bind="_nomeCategoria" />
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-secondary" @onclick="() => _categoriaEditando = null">Cancelar</button>
+            <button type="button" class="btn btn-brasa flex-grow-1" @onclick="SalvarCategoriaAsync">Salvar</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_grupoEditando is not null" Titulo="Grupo de opções" OnFechar="() => _grupoEditando = null">
+        <ChildContent>
+            @if (_grupoEditando is not null)
+            {
+                <label class="form-label">Nome</label>
+                <input class="form-control mb-2" maxlength="60" @bind="_grupoEditando.Nome" placeholder="Ex.: Ponto da Carne" />
+                <div class="form-check">
+                    <input id="grupo-obrigatorio" class="form-check-input" type="checkbox" @bind="_grupoEditando.Obrigatorio" />
+                    <label class="form-check-label" for="grupo-obrigatorio">Obrigatório escolher</label>
+                </div>
+                <div class="form-check mb-2">
+                    <input id="grupo-unica" class="form-check-input" type="checkbox" @bind="_grupoEditando.SelecaoUnica" />
+                    <label class="form-check-label" for="grupo-unica">Apenas uma opção</label>
+                </div>
+                <label class="form-label">Opções (uma por linha)</label>
+                <textarea class="form-control" rows="5" @bind="_opcoesGrupo"></textarea>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-secondary" @onclick="() => _grupoEditando = null">Cancelar</button>
+            <button type="button" class="btn btn-brasa flex-grow-1" @onclick="SalvarGrupoAsync">Salvar</button>
+        </Rodape>
+    </Modal>
+</AreaProtegida>
+
+@code {
+    private List<Produto> _produtos = [];
+    private List<CategoriaProduto> _categorias = [];
+    private List<GrupoModificador> _grupos = [];
+
+    private Produto? _produto;
+    private string? _precoProduto;
+    private HashSet<int> _gruposProduto = [];
+    private CategoriaProduto? _categoriaEditando;
+    private string? _nomeCategoria;
+    private GrupoModificador? _grupoEditando;
+    private string? _opcoesGrupo;
+
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private async Task CarregarAsync()
+    {
+        _produtos = await CardapioService.ListarProdutosAsync();
+        _categorias = await CardapioService.ListarCategoriasAsync();
+        _grupos = await CardapioService.ListarGruposAsync();
+    }
+
+    private void EditarProduto(Produto? produto)
+    {
+        _produto = produto is null
+            ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, TipoItem = TipoItem.PorcaoCozinha, SetorImpressao = SetorImpressao.Cozinha, Ativo = true }
+            : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressao = produto.SetorImpressao, Ativo = produto.Ativo };
+        _precoProduto = Formato.ValorEditavel(_produto.Preco);
+        _gruposProduto = produto?.GruposModificadores.Select(g => g.GrupoModificadorId).ToHashSet() ?? [];
+    }
+
+    private async Task SalvarProdutoAsync()
+    {
+        if (_produto is null) return;
+        await ExecutarAsync(async () =>
+        {
+            if (!Formato.TentarLerValor(_precoProduto, out var preco)) throw new RegraNegocioException("Preço inválido.");
+            _produto.Preco = preco;
+            await CardapioService.SalvarProdutoAsync(_produto, _gruposProduto);
+            _produto = null;
+        }, "Produto salvo.");
+    }
+
+    private void EditarCategoria(CategoriaProduto? categoria)
+    {
+        _categoriaEditando = categoria ?? new CategoriaProduto();
+        _nomeCategoria = _categoriaEditando.Nome;
+    }
+
+    private async Task SalvarCategoriaAsync()
+    {
+        if (_categoriaEditando is null) return;
+        await ExecutarAsync(async () =>
+        {
+            await CardapioService.SalvarCategoriaAsync(_categoriaEditando.Id, _nomeCategoria ?? string.Empty);
+            _categoriaEditando = null;
+        }, "Categoria salva.");
+    }
+
+    private void EditarGrupo(GrupoModificador? grupo)
+    {
+        _grupoEditando = grupo is null
+            ? new GrupoModificador()
+            : new GrupoModificador { Id = grupo.Id, Nome = grupo.Nome, Obrigatorio = grupo.Obrigatorio, SelecaoUnica = grupo.SelecaoUnica };
+        _opcoesGrupo = grupo is null ? string.Empty : string.Join(Environment.NewLine, grupo.Opcoes.Select(o => o.Nome));
+    }
+
+    private async Task SalvarGrupoAsync()
+    {
+        if (_grupoEditando is null) return;
+        await ExecutarAsync(async () =>
+        {
+            var opcoes = (_opcoesGrupo ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            await CardapioService.SalvarGrupoAsync(_grupoEditando.Id, _grupoEditando.Nome, _grupoEditando.Obrigatorio, _grupoEditando.SelecaoUnica, opcoes);
+            _grupoEditando = null;
+        }, "Grupo salvo.");
+    }
+
+    private async Task ExecutarAsync(Func<Task> acao, string sucesso)
+    {
+        try
+        {
+            await acao();
+            await CarregarAsync();
+            _aviso = sucesso;
+            _tipoAviso = "sucesso";
+        }
+        catch (RegraNegocioException ex)
+        {
+            _aviso = ex.Message;
+            _tipoAviso = "erro";
+        }
+    }
+}

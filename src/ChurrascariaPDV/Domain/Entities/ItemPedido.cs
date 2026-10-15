@@ -11,6 +11,11 @@ public class ItemPedido
     public bool Cancelado { get; set; }
     public string? MotivoCancelamento { get; set; }
     public bool AutorizadoPorGerente { get; set; }
+    public int? UsuarioGerenteAutorizacaoId { get; set; }
+    public DateTime? DataHoraCancelamento { get; set; }
     public Pedido Pedido { get; set; } = null!;
     public Produto Produto { get; set; } = null!;
+    public Usuario? UsuarioGerenteAutorizacao { get; set; }
+
+    public decimal ValorTotal => Cancelado ? 0 : Math.Round(Quantidade * PrecoUnitarioHistorico, 2, MidpointRounding.AwayFromZero);
 }

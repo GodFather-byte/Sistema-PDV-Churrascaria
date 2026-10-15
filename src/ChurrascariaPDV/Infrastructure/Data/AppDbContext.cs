@@ -33,8 +33,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<Comanda>(entity =>
         {
-            entity.HasIndex(comanda => new { comanda.MesaId, comanda.CodigoNumero }).IsUnique();
+            entity.HasIndex(comanda => new { comanda.MesaId, comanda.CodigoNumero, comanda.Status });
             entity.Property(comanda => comanda.Status).HasConversion<string>();
+            entity.Ignore(comanda => comanda.ContaGeral);
+            entity.Ignore(comanda => comanda.Descricao);
             entity.Property(comanda => comanda.NomeCliente).HasMaxLength(100);
             entity.HasOne(comanda => comanda.Mesa)
                 .WithMany(mesa => mesa.Comandas)
@@ -105,6 +107,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(item => item.PrecoUnitarioHistorico).HasPrecision(10, 2);
             entity.Property(item => item.ObservacoesModificadores).HasMaxLength(500);
             entity.Property(item => item.MotivoCancelamento).HasMaxLength(250);
+            entity.Ignore(item => item.ValorTotal);
+            entity.HasOne(item => item.Pedido)
+                .WithMany(pedido => pedido.Itens)
+                .HasForeignKey(item => item.PedidoId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.Produto)
+                .WithMany(produto => produto.ItensPedido)
+                .HasForeignKey(item => item.ProdutoId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.UsuarioGerenteAutorizacao)
+                .WithMany()
+                .HasForeignKey(item => item.UsuarioGerenteAutorizacaoId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Pagamento>(entity =>
@@ -113,6 +128,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(pagamento => pagamento.ValorPago).HasPrecision(10, 2);
             entity.Property(pagamento => pagamento.ValorTroco).HasPrecision(10, 2);
             entity.Property(pagamento => pagamento.ValorTaxaServicoIncluso).HasPrecision(10, 2);
+            entity.Property(pagamento => pagamento.MotivoEstorno).HasMaxLength(250);
+            entity.Ignore(pagamento => pagamento.ValorRecebido);
+            entity.HasOne(pagamento => pagamento.TurnoCaixa)
+                .WithMany(turno => turno.Pagamentos)
+                .HasForeignKey(pagamento => pagamento.TurnoCaixaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(pagamento => pagamento.Usuario)
+                .WithMany()
+                .HasForeignKey(pagamento => pagamento.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(pagamento => pagamento.Mesa)
                 .WithMany(mesa => mesa.Pagamentos)
                 .HasForeignKey(pagamento => pagamento.MesaId)
@@ -142,6 +167,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             entity.Property(turno => turno.FundoTroco).HasPrecision(10, 2);
             entity.Property(turno => turno.ValorFechamento).HasPrecision(10, 2);
+            entity.Property(turno => turno.ValorEsperadoDinheiro).HasPrecision(10, 2);
+            entity.Property(turno => turno.Observacao).HasMaxLength(250);
+            entity.Ignore(turno => turno.Aberto);
+            entity.HasOne(turno => turno.UsuarioAbertura)
+                .WithMany()
+                .HasForeignKey(turno => turno.UsuarioAberturaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(turno => turno.UsuarioFechamento)
+                .WithMany()
+                .HasForeignKey(turno => turno.UsuarioFechamentoId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<MovimentacaoCaixa>(entity =>
@@ -149,6 +185,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(movimentacao => movimentacao.Tipo).HasConversion<string>();
             entity.Property(movimentacao => movimentacao.Valor).HasPrecision(10, 2);
             entity.Property(movimentacao => movimentacao.Observacao).HasMaxLength(250);
+            entity.HasOne(movimentacao => movimentacao.TurnoCaixa)
+                .WithMany(turno => turno.Movimentacoes)
+                .HasForeignKey(movimentacao => movimentacao.TurnoCaixaId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(movimentacao => movimentacao.Usuario)
+                .WithMany()
+                .HasForeignKey(movimentacao => movimentacao.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Usuario>(entity =>
@@ -156,6 +200,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(usuario => usuario.Nome).HasMaxLength(100).IsRequired();
             entity.Property(usuario => usuario.PinAcesso).HasMaxLength(4).IsRequired();
             entity.Property(usuario => usuario.Perfil).HasConversion<string>();
+            entity.HasIndex(usuario => usuario.PinAcesso).IsUnique();
         });
 
         SeedData(modelBuilder);
@@ -170,8 +215,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 Numero = numero,
                 CapacidadeLugares = numero <= 10 ? 2 : numero <= 35 ? 4 : 6,
                 Status = Domain.Enums.StatusMesa.Livre,
+                QuantidadePessoas = 0,
                 ValorTotalAtual = 0
             }));
+
+        modelBuilder.Entity<Usuario>().HasData(
+            new Usuario { Id = 1, Nome = "Gerente", PinAcesso = "1234", Perfil = Domain.Enums.PerfilUsuario.Gerente, Ativo = true },
+            new Usuario { Id = 2, Nome = "Operador Caixa", PinAcesso = "2222", Perfil = Domain.Enums.PerfilUsuario.OperadorCaixa, Ativo = true },
+            new Usuario { Id = 3, Nome = "João", PinAcesso = "1111", Perfil = Domain.Enums.PerfilUsuario.Garcom, Ativo = true },
+            new Usuario { Id = 4, Nome = "Maria", PinAcesso = "3333", Perfil = Domain.Enums.PerfilUsuario.Garcom, Ativo = true });
 
         modelBuilder.Entity<CategoriaProduto>().HasData(
             new CategoriaProduto { Id = 1, Nome = "Rodízio" },
@@ -193,8 +245,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             new { Id = 10, Nome = "Petit Gateau", Preco = 24.90m, CategoriaId = 5, TipoItem = Domain.Enums.TipoItem.Sobremesa, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true });
 
         modelBuilder.Entity<GrupoModificador>().HasData(
-            new GrupoModificador { Id = 1, Nome = "Ponto da Carne", Obrigatorio = true },
-            new GrupoModificador { Id = 2, Nome = "Preferência Bebida", Obrigatorio = false });
+            new GrupoModificador { Id = 1, Nome = "Ponto da Carne", Obrigatorio = true, SelecaoUnica = true },
+            new GrupoModificador { Id = 2, Nome = "Preferência Bebida", Obrigatorio = false, SelecaoUnica = false });
 
         modelBuilder.Entity<OpcaoModificador>().HasData(
             new OpcaoModificador { Id = 1, GrupoModificadorId = 1, Nome = "Malpassada" },

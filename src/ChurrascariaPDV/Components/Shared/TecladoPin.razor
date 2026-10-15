@@ -1,0 +1,66 @@
+<div class="teclado-pin @(Compacto ? "compacto" : string.Empty)">
+    @if (!string.IsNullOrEmpty(Titulo))
+    {
+        <div class="teclado-pin-titulo">@Titulo</div>
+    }
+    <div class="teclado-pin-digitos @(Erro is null ? string.Empty : "erro")">
+        @for (var i = 0; i < 4; i++)
+        {
+            <span class="@(i < _pin.Length ? "preenchido" : string.Empty)"></span>
+        }
+    </div>
+    <div class="teclado-pin-erro">@Erro</div>
+    <div class="teclado-pin-teclas">
+        @foreach (var tecla in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" })
+        {
+            <button type="button" disabled="@Ocupado" @onclick="() => Digitar(tecla)">@tecla</button>
+        }
+        <button type="button" class="secundaria" disabled="@Ocupado" @onclick="Limpar">Limpar</button>
+        <button type="button" disabled="@Ocupado" @onclick='() => Digitar("0")'>0</button>
+        <button type="button" class="secundaria" disabled="@Ocupado" @onclick="Apagar">⌫</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? Titulo { get; set; }
+    [Parameter] public string? Erro { get; set; }
+    [Parameter] public bool Ocupado { get; set; }
+    [Parameter] public bool Compacto { get; set; }
+    [Parameter] public EventCallback<string> OnPinCompleto { get; set; }
+    [Parameter] public EventCallback<string> OnAlterado { get; set; }
+
+    private string _pin = string.Empty;
+
+    public void Limpar()
+    {
+        _pin = string.Empty;
+        OnAlterado.InvokeAsync(_pin);
+        StateHasChanged();
+    }
+
+    private async Task Digitar(string digito)
+    {
+        if (_pin.Length >= 4)
+        {
+            return;
+        }
+
+        _pin += digito;
+        await OnAlterado.InvokeAsync(_pin);
+        if (_pin.Length == 4)
+        {
+            var pin = _pin;
+            _pin = string.Empty;
+            await OnPinCompleto.InvokeAsync(pin);
+        }
+    }
+
+    private async Task Apagar()
+    {
+        if (_pin.Length > 0)
+        {
+            _pin = _pin[..^1];
+            await OnAlterado.InvokeAsync(_pin);
+        }
+    }
+}

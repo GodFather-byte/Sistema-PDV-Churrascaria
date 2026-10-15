@@ -86,7 +86,7 @@
                     <div class="caixa-vazio">
                         <h2>Selecione uma mesa</h2>
                         <p>Clique no mapa ou digite o número e pressione Enter.</p>
-                        <TabelaAtalhos />
+                        <TabelaAtalhos TaxaServicoOpcional="@(_detalhe?.TaxaServicoOpcionalPorComanda ?? true)" />
                     </div>
                 }
                 else
@@ -469,7 +469,7 @@
 
     <Modal Aberto="_ajuda" Titulo="Atalhos do caixa" OnFechar="() => _ajuda = false">
         <ChildContent>
-            <TabelaAtalhos />
+            <TabelaAtalhos TaxaServicoOpcional="@(_detalhe?.TaxaServicoOpcionalPorComanda ?? true)" />
         </ChildContent>
     </Modal>
 </AreaProtegida>
@@ -665,7 +665,12 @@
                 case "F4": if (ItemSelecionadoAtivo is not null) await AbrirTransferirItemAsync(); break;
                 case "F5": await RecarregarTudoAsync(); Avisar("Atualizado.", "info"); break;
                 case "F6": if (_detalhe?.TemConsumo == true) await ImprimirPreContaAsync(); break;
-                case "F7": if (_detalhe?.Comandas.Count > 0) await AlternarTaxaAsync(); break;
+                case "F7":
+                    if (_detalhe is { TaxaServicoOpcionalPorComanda: true, Comandas.Count: > 0 })
+                    {
+                        await AlternarTaxaAsync();
+                    }
+                    break;
                 case "F8": if (ItemSelecionadoAtivo is not null) AbrirCancelamento(); break;
                 case "F9":
                     if (MesaAberta && Formato.TentarLerValor(_valorPagamento, out _)) await ReceberAsync();

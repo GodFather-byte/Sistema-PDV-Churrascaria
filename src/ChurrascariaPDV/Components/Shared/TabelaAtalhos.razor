@@ -7,7 +7,10 @@
         <tr><td><kbd>F4</kbd></td><td>Transferir item selecionado</td></tr>
         <tr><td><kbd>F5</kbd></td><td>Atualizar</td></tr>
         <tr><td><kbd>F6</kbd></td><td>Imprimir pré-conta</td></tr>
-        <tr><td><kbd>F7</kbd></td><td>Ativar/desativar taxa de serviço</td></tr>
+        @if (TaxaServicoOpcional)
+        {
+            <tr><td><kbd>F7</kbd></td><td>Ativar/desativar taxa de serviço</td></tr>
+        }
         <tr><td><kbd>F8</kbd></td><td>Cancelar item selecionado (PIN gerente)</td></tr>
         <tr><td><kbd>F9</kbd></td><td>Receber pagamento</td></tr>
         <tr><td><kbd>F10</kbd></td><td>Finalizar / liberar mesa</td></tr>
@@ -16,3 +19,7 @@
         <tr><td><kbd>Esc</kbd></td><td>Fechar janela / limpar seleção</td></tr>
     </tbody>
 </table>
+
+@code {
+    [Parameter] public bool TaxaServicoOpcional { get; set; } = true;
+}

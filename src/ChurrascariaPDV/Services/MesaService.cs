@@ -183,7 +183,7 @@ public class MesaService(
         return comanda.Id;
     }
 
-    /// <summary>Liga/desliga os 10% de uma comanda ou de todas as comandas abertas da mesa.</summary>
+    /// <summary>Liga/desliga a taxa de serviço de uma comanda ou de todas as comandas abertas da mesa.</summary>
     public async Task DefinirTaxaServicoAsync(int mesaId, int? comandaId, bool cobrar)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -403,7 +403,8 @@ public class MesaService(
             .ToList();
 
         var documento = TicketsImpressao.PreConta(impressao.NovoDocumento(perfil), perfil.Nome,
-            mesa.Numero, mesa.DataHoraAbertura, mesa.QuantidadePessoas, ticket);
+            mesa.Numero, mesa.DataHoraAbertura, mesa.QuantidadePessoas, ticket,
+            perfil.PercentualTaxaServico, perfil.TaxaServicoOpcionalPorComanda);
         return await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Pré-conta mesa {mesa.Numero}", documento);
     }
 

@@ -70,7 +70,7 @@ public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
                 g.Select(i => i.PedidoId).Distinct().Count(),
                 g.Sum(i => i.ValorTotal),
                 g.Sum(i => CalculoConta.CalcularTaxa(
-                    i.ValorTotal, i.Pedido.Comanda.CobrarTaxaServico, perfil)))
+                    i.ValorTotal, i.Pedido.Comanda.CobrarTaxaServico, perfil))))
             .OrderByDescending(v => v.ValorItens)
             .ToList();
 

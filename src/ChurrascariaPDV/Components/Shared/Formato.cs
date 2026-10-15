@@ -49,6 +49,17 @@ public static class Formato
         _ => perfil.ToString()
     };
 
+    public static string TipoEstabelecimento(TipoEstabelecimento tipo) => tipo switch
+    {
+        Domain.Enums.TipoEstabelecimento.Bar => "Bar",
+        Domain.Enums.TipoEstabelecimento.Restaurante => "Restaurante",
+        Domain.Enums.TipoEstabelecimento.Churrascaria => "Churrascaria",
+        Domain.Enums.TipoEstabelecimento.Pizzaria => "Pizzaria",
+        Domain.Enums.TipoEstabelecimento.Hamburgueria => "Hamburgueria",
+        Domain.Enums.TipoEstabelecimento.Outro => "Outro",
+        _ => tipo.ToString()
+    };
+
     public static string Setor(SetorImpressao setor) => setor switch
     {
         SetorImpressao.Nenhum => "Sem impressão",

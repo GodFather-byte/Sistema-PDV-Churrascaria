@@ -999,6 +999,55 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.ToTable("Pedidos");
                 });
 
+            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.PerfilEstabelecimento", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Endereco")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LarguraTicket")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(48);
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("PercentualTaxaServico")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("TaxaServicoOpcionalPorComanda")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PerfisEstabelecimento");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Endereco = "",
+                            LarguraTicket = 48,
+                            Nome = "CHURRASCARIA",
+                            PercentualTaxaServico = 10m,
+                            TaxaServicoOpcionalPorComanda = true,
+                            Tipo = "Churrascaria"
+                        });
+                });
+
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.Produto", b =>
                 {
                     b.Property<int>("Id")
@@ -1363,6 +1412,31 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.MovimentacaoEstoque", b =>
+                {
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.ItemPedido", "ItemPedido")
+                        .WithMany()
+                        .HasForeignKey("ItemPedidoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.Produto", "Produto")
+                        .WithMany("MovimentacoesEstoque")
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.Usuario", "Usuario")
+                        .WithMany("MovimentacoesEstoque")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ItemPedido");
+
+                    b.Navigation("Produto");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.OpcaoModificador", b =>
                 {
                     b.HasOne("ChurrascariaPDV.Domain.Entities.GrupoModificador", "GrupoModificador")
@@ -1402,31 +1476,6 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("Mesa");
 
                     b.Navigation("TurnoCaixa");
-
-                    b.Navigation("Usuario");
-                });
-
-            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.MovimentacaoEstoque", b =>
-                {
-                    b.HasOne("ChurrascariaPDV.Domain.Entities.ItemPedido", "ItemPedido")
-                        .WithMany()
-                        .HasForeignKey("ItemPedidoId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("ChurrascariaPDV.Domain.Entities.Produto", "Produto")
-                        .WithMany("MovimentacoesEstoque")
-                        .HasForeignKey("ProdutoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ChurrascariaPDV.Domain.Entities.Usuario", "Usuario")
-                        .WithMany("MovimentacoesEstoque")
-                        .HasForeignKey("UsuarioId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ItemPedido");
-
-                    b.Navigation("Produto");
 
                     b.Navigation("Usuario");
                 });
@@ -1537,9 +1586,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.Usuario", b =>
                 {
-                    b.Navigation("Pedidos");
-
                     b.Navigation("MovimentacoesEstoque");
+
+                    b.Navigation("Pedidos");
                 });
 #pragma warning restore 612, 618
         }

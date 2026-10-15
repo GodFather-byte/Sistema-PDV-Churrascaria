@@ -93,16 +93,20 @@ public static class TicketsImpressao
         int numeroMesa,
         DateTime? abertura,
         int pessoas,
-        IReadOnlyList<ComandaTicketConta> comandas)
+        IReadOnlyList<ComandaTicketConta> comandas,
+        decimal percentualTaxaServico,
+        bool taxaOpcionalPorComanda,
+        DateTime? dataHora = null)
     {
+        var agora = dataHora ?? DateTime.Now;
         doc.Centro(estabelecimento, negrito: true, grande: true)
             .Centro("CONFERÊNCIA DE MESA", negrito: true)
             .Centro("NÃO É DOCUMENTO FISCAL")
             .Separador('=')
-            .Colunas($"MESA {numeroMesa}", DateTime.Now.ToString("dd/MM/yyyy HH:mm", PtBr), negrito: true);
+            .Colunas($"MESA {numeroMesa}", agora.ToString("dd/MM/yyyy HH:mm", PtBr), negrito: true);
         if (abertura is not null)
         {
-            doc.Texto($"Entrada: {abertura:HH:mm}  Permanência: {FormatarDuracao(DateTime.Now - abertura.Value)}");
+            doc.Texto($"Entrada: {abertura:HH:mm}  Permanência: {FormatarDuracao(agora - abertura.Value)}");
         }
 
         foreach (var comanda in comandas)
@@ -118,7 +122,9 @@ public static class TicketsImpressao
             }
 
             doc.Colunas("Subtotal", Moeda(comanda.Resumo.Subtotal));
-            doc.Colunas(comanda.Resumo.TaxaServico > 0 ? "Serviço (10%)" : "Serviço (não cobrado)", Moeda(comanda.Resumo.TaxaServico));
+            doc.Colunas(comanda.Resumo.TaxaServico > 0
+                ? $"Serviço ({FormatarPercentual(percentualTaxaServico)}%)"
+                : "Serviço (não cobrado)", Moeda(comanda.Resumo.TaxaServico));
             if (comanda.Resumo.Pago > 0)
             {
                 doc.Colunas("Já pago", "-" + Moeda(comanda.Resumo.Pago));
@@ -138,10 +144,20 @@ public static class TicketsImpressao
             doc.Texto($"{Moeda(geral.Saldo)} / {pessoas} pessoas = {Moeda(geral.ValorPorPessoa(pessoas))} por pessoa", negrito: true);
         }
 
-        return doc.Separador('=').Centro("O serviço de 10% é opcional.").Centro("Obrigado pela preferência!");
+        return doc.Separador('=')
+            .Centro(taxaOpcionalPorComanda
+                ? $"O serviço de {FormatarPercentual(percentualTaxaServico)}% é opcional."
+                : percentualTaxaServico > 0
+                    ? $"Taxa de serviço de {FormatarPercentual(percentualTaxaServico)}% aplicada."
+                    : "Não há taxa de serviço configurada.")
+            .Centro("Obrigado pela preferência!");
     }
 
-    public static DocumentoEscPos FechamentoTurno(DocumentoEscPos doc, string estabelecimento, ResumoTurno resumo)
+    public static DocumentoEscPos FechamentoTurno(
+        DocumentoEscPos doc,
+        string estabelecimento,
+        ResumoTurno resumo,
+        decimal percentualTaxaServico)
     {
         doc.Centro(estabelecimento, negrito: true)
             .Centro("FECHAMENTO DE CAIXA", negrito: true, grande: true)
@@ -157,7 +173,7 @@ public static class TicketsImpressao
         }
 
         doc.Colunas("Total recebido", Moeda(resumo.TotalRecebido), negrito: true)
-            .Colunas("  dos quais serviço 10%", Moeda(resumo.TotalTaxaServico))
+            .Colunas($"  dos quais serviço {FormatarPercentual(percentualTaxaServico)}%", Moeda(resumo.TotalTaxaServico))
             .Separador()
             .Texto("GAVETA (DINHEIRO)", negrito: true)
             .Colunas("Fundo de troco", Moeda(resumo.FundoTroco))
@@ -189,5 +205,9 @@ public static class TicketsImpressao
     };
 
     public static string FormatarDuracao(TimeSpan duracao) =>
-        duracao.TotalHours >= 1 ? $"{(int)duracao.TotalHours}h{duracao.Minutes:00}" : $"{Math.Max(0, duracao.Minutes)}min";
+        duracao.TotalHours >= 1
+            ? $"{(int)duracao.TotalHours}h{duracao.Minutes:00}"
+            : $"{Math.Max(0, duracao.Minutes)}min";
+
+    private static string FormatarPercentual(decimal percentual) => percentual.ToString("0.##", PtBr);
 }

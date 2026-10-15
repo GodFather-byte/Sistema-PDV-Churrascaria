@@ -1,0 +1,73 @@
+@page "/admin/estabelecimento"
+@inject PerfilEstabelecimentoService PerfilService
+
+<PageTitle>Estabelecimento</PageTitle>
+
+<AreaProtegida Area="gerencia" Titulo="Estabelecimento (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => CarregarAsync()">
+    <h1 class="mb-3">Perfil do estabelecimento</h1>
+    <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+    @if (_perfil is null)
+    {
+        <div class="pdv-carregando">Carregando…</div>
+    }
+    else
+    {
+        <div class="painel">
+            <label class="form-label" for="estabelecimento-tipo">Tipo</label>
+            <select id="estabelecimento-tipo" class="form-select mb-3" @bind="_perfil.Tipo">
+                @foreach (var tipo in Enum.GetValues<TipoEstabelecimento>())
+                {
+                    <option value="@tipo">@Formato.TipoEstabelecimento(tipo)</option>
+                }
+            </select>
+
+            <label class="form-label" for="estabelecimento-nome">Nome</label>
+            <input id="estabelecimento-nome" class="form-control mb-3" maxlength="120" @bind="_perfil.Nome" />
+
+            <label class="form-label" for="estabelecimento-endereco">Endereço</label>
+            <input id="estabelecimento-endereco" class="form-control mb-3" maxlength="250" @bind="_perfil.Endereco" />
+
+            <label class="form-label" for="estabelecimento-taxa">Taxa de serviço (%)</label>
+            <input id="estabelecimento-taxa" class="form-control mb-3" type="number" min="0" max="100" step="0.01" @bind="_perfil.PercentualTaxaServico" />
+
+            <div class="form-check mb-3">
+                <input id="estabelecimento-taxa-opcional" class="form-check-input" type="checkbox" @bind="_perfil.TaxaServicoOpcionalPorComanda" />
+                <label class="form-check-label" for="estabelecimento-taxa-opcional">Permitir alterar a taxa por comanda</label>
+            </div>
+
+            <label class="form-label" for="estabelecimento-largura">Largura do ticket (colunas)</label>
+            <input id="estabelecimento-largura" class="form-control mb-3" type="number" min="16" max="80" @bind="_perfil.LarguraTicket" />
+
+            <button type="button" class="btn btn-brasa" @onclick="SalvarAsync">Salvar perfil</button>
+        </div>
+    }
+</AreaProtegida>
+
+@code {
+    private PerfilEstabelecimento? _perfil;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private async Task CarregarAsync() => _perfil = await PerfilService.ObterAsync();
+
+    private async Task SalvarAsync()
+    {
+        if (_perfil is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await PerfilService.SalvarAsync(_perfil);
+            _aviso = "Perfil do estabelecimento salvo.";
+            _tipoAviso = "sucesso";
+        }
+        catch (RegraNegocioException ex)
+        {
+            _aviso = ex.Message;
+            _tipoAviso = "erro";
+        }
+    }
+}

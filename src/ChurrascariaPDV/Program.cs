@@ -32,6 +32,7 @@ builder.Services.AddScoped<PedidoService>();
 builder.Services.AddScoped<PagamentoService>();
 builder.Services.AddScoped<CaixaService>();
 builder.Services.AddScoped<RelatorioService>();
+builder.Services.AddScoped<PerfilEstabelecimentoService>();
 builder.Services.AddScoped<SessaoUsuario>();
 
 var app = builder.Build();

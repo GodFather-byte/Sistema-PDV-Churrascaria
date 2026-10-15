@@ -58,6 +58,7 @@ public sealed class AmbienteTeste : IAsyncDisposable
         services.AddScoped<PagamentoService>();
         services.AddScoped<CaixaService>();
         services.AddScoped<RelatorioService>();
+        services.AddScoped<PerfilEstabelecimentoService>();
 
         var provider = services.BuildServiceProvider();
         await using (var db = await provider.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync())

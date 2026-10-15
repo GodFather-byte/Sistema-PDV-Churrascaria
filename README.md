@@ -22,6 +22,10 @@ dotnet run --project src/ChurrascariaPDV
 O banco `churrascaria.db` (SQLite) é criado e atualizado automaticamente via migrations na inicialização.
 Se existir um banco da primeira versão (criado sem migrations), ele é renomeado para `churrascaria.db.legado-<data>.bak` e um novo é criado.
 
+O perfil inicial é uma churrascaria com taxa de serviço de 10% opcional por comanda e ticket de 48 colunas.
+Um gerente pode alterar o tipo e os dados do estabelecimento, a taxa e a largura do ticket em
+**Perfil do estabelecimento** (`/admin/estabelecimento`).
+
 ### Liberar o acesso dos celulares (Windows)
 
 Execute uma vez, como administrador, no PC do caixa:
@@ -61,7 +65,7 @@ Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em prod
      porções para a Cozinha e cortes para a Churrasqueira (com o ponto em MAIÚSCULAS).
    - **+ Comanda** cria uma comanda individual na mesa para quem quer pagar separado.
 3. **Pedir Fechamento / Pré-Conta**: a mesa fica amarela piscando e a conferência é impressa no caixa.
-4. **Caixa** seleciona a mesa (clique ou digite o número + Enter), confere os itens, liga/desliga os 10% e recebe:
+4. **Caixa** seleciona a mesa (clique ou digite o número + Enter), confere os itens, aplica a taxa de serviço configurada e recebe:
    - pagamento parcial ou total em Dinheiro (com troco), Pix, Cartão Crédito ou Débito;
    - divisão automática por pessoa (“R$ 440,00 / 4 = R$ 110,00”), com botão para usar o valor por pessoa;
    - quando o saldo chega a R$ 0,00 a mesa vai para *Limpeza* (azul/cinza); depois, **Mesa limpa · Liberar** (F10).
@@ -72,7 +76,7 @@ Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em prod
 
 | Tecla | Ação | Tecla | Ação |
 |-------|------|-------|------|
-| `0-9` + `Enter` | Selecionar mesa | `F7` | Ativar/desativar 10% |
+| `0-9` + `Enter` | Selecionar mesa | `F7` | Ativar/desativar taxa de serviço (quando opcional) |
 | `F1` | Ajuda | `F8` | Cancelar item (PIN do gerente) |
 | `F2` | Lançar item | `F9` | Receber pagamento |
 | `F3` | Transferir mesa | `F10` | Finalizar / liberar mesa |
@@ -89,7 +93,7 @@ Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em prod
 - **Transferência de item** (total ou parcial) para outra comanda, da mesma mesa ou de outra.
 - **Cancelamento** (total ou parcial) exige PIN de gerente e motivo; o setor recebe um ticket “NÃO PREPARAR”.
   Não é permitido cancelar se os pagamentos já feitos passarem a ser maiores que o consumo.
-- **Taxa de serviço** de 10% opcional por comanda; fica registrada em cada pagamento para o relatório.
+- **Taxa de serviço** configurável no perfil do estabelecimento e opcional por comanda quando habilitado; fica registrada em cada pagamento para o relatório.
 - **Estorno de pagamento** com PIN de gerente, enquanto a conta e o turno estiverem abertos.
 - Novo item depois da pré-conta devolve a mesa para *Ocupada*.
 - **Estoque de produtos prontos**: ative o controle no cadastro do produto e lance entradas/saídas em Estoque.
@@ -103,7 +107,6 @@ Configure em `src/ChurrascariaPDV/appsettings.json`:
 ```json
 "Impressao": {
   "ModoSimulacao": true,
-  "NomeEstabelecimento": "CHURRASCARIA",
   "Impressoras": {
     "BarCopa":       { "Ip": "192.168.0.101", "Porta": 9100, "Habilitada": true },
     "Cozinha":       { "Ip": "192.168.0.102", "Porta": 9100, "Habilitada": true },

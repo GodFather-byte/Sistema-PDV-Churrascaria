@@ -35,7 +35,9 @@ netsh advfirewall firewall add rule name="Churrascaria PDV" dir=in action=allow 
 dotnet publish src/ChurrascariaPDV -c Release -r win-x64 --self-contained -o publicacao
 ```
 
-Copie a pasta `publicacao` para o PC do caixa e execute `ChurrascariaPDV.exe`. Para abrir o caixa em tela cheia,
+Copie a pasta `publicacao` para o PC do caixa junto com os arquivos de `scripts/`:
+`liberar-firewall.bat` (executar uma vez como administrador) e `iniciar-caixa.bat`, que sobe o servidor e abre o caixa
+em tela cheia. Também é possível executar `ChurrascariaPDV.exe` diretamente. Para abrir o caixa em tela cheia,
 use o navegador em modo quiosque, por exemplo: `msedge --kiosk http://localhost:5000/caixa --edge-kiosk-type=fullscreen`.
 
 ## Acessos iniciais (PIN de 4 dígitos)

@@ -40,6 +40,7 @@ public class PedidoService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         await using var transacao = await db.Database.BeginTransactionAsync();
 
         var garcom = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == novo.UsuarioId && u.Ativo)
@@ -91,10 +92,11 @@ public class PedidoService(
 
         pedido.Comanda = comanda;
         db.Pedidos.Add(pedido);
-        await ContaMesa.AtualizarValorAsync(db, mesa);
+        await ContaMesa.AtualizarValorAsync(db, mesa, perfil);
         await transacao.CommitAsync();
 
-        var (impressos, falhas) = await ImprimirProducaoAsync(mesa.Numero, comanda.Descricao, garcom.Nome, pedido, reimpressao: false);
+        var (impressos, falhas) = await ImprimirProducaoAsync(
+            mesa.Numero, comanda.Descricao, garcom.Nome, pedido, perfil, reimpressao: false);
         pedido.ImpressoNosSetores = falhas.Count == 0;
         await db.SaveChangesAsync();
 
@@ -105,6 +107,7 @@ public class PedidoService(
     public async Task<ResultadoPedido> ReimprimirPedidoAsync(int pedidoId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var pedido = await db.Pedidos
             .Include(p => p.Itens).ThenInclude(i => i.Produto)
             .Include(p => p.Mesa)
@@ -114,7 +117,7 @@ public class PedidoService(
             ?? throw new RegraNegocioException("Pedido não encontrado.");
 
         var (impressos, falhas) = await ImprimirProducaoAsync(pedido.Mesa.Numero, pedido.Comanda.Descricao,
-            pedido.UsuarioGarcom.Nome, pedido, reimpressao: true);
+            pedido.UsuarioGarcom.Nome, pedido, perfil, reimpressao: true);
         if (falhas.Count == 0 && !pedido.ImpressoNosSetores)
         {
             pedido.ImpressoNosSetores = true;
@@ -134,6 +137,7 @@ public class PedidoService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         await using var transacao = await db.Database.BeginTransactionAsync();
         var gerente = await UsuarioService.ValidarGerenteAsync(db, pinGerente);
 
@@ -183,14 +187,14 @@ public class PedidoService(
             pedido.Status = StatusPedido.Cancelado;
         }
 
-        ContaMesa.GarantirSaldoNaoNegativo(comanda);
+        ContaMesa.GarantirSaldoNaoNegativo(comanda, perfil);
         EstoqueService.RegistrarPerdaPorCancelamento(db, cancelado, gerente.Id, cancelado.MotivoCancelamento);
-        await ContaMesa.AtualizarValorAsync(db, pedido.Mesa);
+        await ContaMesa.AtualizarValorAsync(db, pedido.Mesa, perfil);
         await transacao.CommitAsync();
 
         if (item.Produto.SetorImpressao != SetorImpressao.Nenhum && pedido.ImpressoNosSetores)
         {
-            var documento = TicketsImpressao.Cancelamento(impressao.NovoDocumento(), item.Produto.SetorImpressao,
+            var documento = TicketsImpressao.Cancelamento(impressao.NovoDocumento(perfil), item.Produto.SetorImpressao,
                 pedido.Mesa.Numero, comanda.Descricao, gerente.Nome, cancelado.MotivoCancelamento,
                 new LinhaTicketProducao(quantidade, item.Produto.Nome, item.ObservacoesModificadores));
             await impressao.ImprimirAsync(item.Produto.SetorImpressao, $"Cancelamento mesa {pedido.Mesa.Numero}", documento);
@@ -203,6 +207,7 @@ public class PedidoService(
     public async Task TransferirItemAsync(int itemId, decimal quantidade, int mesaDestinoId, int? comandaDestinoId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         await using var transacao = await db.Database.BeginTransactionAsync();
 
         var item = await db.ItensPedido.FirstOrDefaultAsync(i => i.Id == itemId)
@@ -275,12 +280,12 @@ public class PedidoService(
 
         await db.SaveChangesAsync();
         var comandaOrigemAtualizada = await ContaMesa.ComandasCompletas(db).FirstAsync(c => c.Id == comandaOrigem.Id);
-        ContaMesa.GarantirSaldoNaoNegativo(comandaOrigemAtualizada);
+        ContaMesa.GarantirSaldoNaoNegativo(comandaOrigemAtualizada, perfil);
 
-        await ContaMesa.AtualizarValorAsync(db, pedidoOrigem.Mesa);
+        await ContaMesa.AtualizarValorAsync(db, pedidoOrigem.Mesa, perfil);
         if (mesaDestino.Id != pedidoOrigem.MesaId)
         {
-            await ContaMesa.AtualizarValorAsync(db, mesaDestino);
+            await ContaMesa.AtualizarValorAsync(db, mesaDestino, perfil);
         }
 
         await transacao.CommitAsync();
@@ -323,7 +328,12 @@ public class PedidoService(
     }
 
     private async Task<(List<SetorImpressao> Impressos, List<SetorImpressao> Falhas)> ImprimirProducaoAsync(
-        int numeroMesa, string comanda, string garcom, Pedido pedido, bool reimpressao)
+        int numeroMesa,
+        string comanda,
+        string garcom,
+        Pedido pedido,
+        PerfilEstabelecimento perfil,
+        bool reimpressao)
     {
         var impressos = new List<SetorImpressao>();
         var falhas = new List<SetorImpressao>();
@@ -336,7 +346,7 @@ public class PedidoService(
 
         foreach (var grupo in porSetor)
         {
-            var documento = TicketsImpressao.Producao(impressao.NovoDocumento(), grupo.Key, numeroMesa, comanda, garcom,
+            var documento = TicketsImpressao.Producao(impressao.NovoDocumento(perfil), grupo.Key, numeroMesa, comanda, garcom,
                 pedido.DataHoraLancamento, pedido.Id,
                 grupo.Select(i => new LinhaTicketProducao(i.Quantidade, i.Produto.Nome, i.ObservacoesModificadores)),
                 reimpressao);

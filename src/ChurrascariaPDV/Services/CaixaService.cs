@@ -144,6 +144,7 @@ public class CaixaService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var turno = await db.TurnosCaixa.Include(t => t.UsuarioAbertura).FirstOrDefaultAsync(t => t.DataHoraFechamento == null)
                     ?? throw new RegraNegocioException("Não há turno de caixa aberto.");
 
@@ -156,7 +157,7 @@ public class CaixaService(
         await db.SaveChangesAsync();
 
         resumo = resumo with { Fechamento = turno.DataHoraFechamento, DinheiroInformado = turno.ValorFechamento };
-        var documento = TicketsImpressao.FechamentoTurno(impressao.NovoDocumento(), impressao.Configuracao.NomeEstabelecimento, resumo);
+        var documento = TicketsImpressao.FechamentoTurno(impressao.NovoDocumento(perfil), perfil.Nome, resumo);
         await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Fechamento do turno #{turno.Id}", documento);
         await notificador.NotificarAsync();
         return resumo;
@@ -175,7 +176,9 @@ public class CaixaService(
     public async Task<bool> ReimprimirFechamentoAsync(int turnoId)
     {
         var resumo = await ObterResumoAsync(turnoId) ?? throw new RegraNegocioException("Turno não encontrado.");
-        var documento = TicketsImpressao.FechamentoTurno(impressao.NovoDocumento(), impressao.Configuracao.NomeEstabelecimento, resumo);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
+        var documento = TicketsImpressao.FechamentoTurno(impressao.NovoDocumento(perfil), perfil.Nome, resumo);
         return await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Fechamento do turno #{turnoId} (2ª via)", documento);
     }
 

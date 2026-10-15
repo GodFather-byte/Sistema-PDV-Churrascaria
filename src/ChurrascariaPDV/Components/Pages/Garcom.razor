@@ -108,7 +108,7 @@
 
                         <div class="resumo-conta">
                             <div><span>Subtotal</span><span>@Formato.Moeda(_detalhe.Resumo.Subtotal)</span></div>
-                            <div><span>Serviço (10%)</span><span>@Formato.Moeda(_detalhe.Resumo.TaxaServico)</span></div>
+                            <div><span>Serviço (@_detalhe.PercentualTaxaServico.ToString("0.##")%)</span><span>@Formato.Moeda(_detalhe.Resumo.TaxaServico)</span></div>
                             @if (_detalhe.Resumo.Pago > 0)
                             {
                                 <div><span>Já pago</span><span>− @Formato.Moeda(_detalhe.Resumo.Pago)</span></div>

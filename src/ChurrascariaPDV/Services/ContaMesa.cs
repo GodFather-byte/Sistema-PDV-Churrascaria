@@ -63,27 +63,32 @@ internal static class ContaMesa
     }
 
     /// <summary>Recalcula o saldo devedor exibido no mapa de mesas.</summary>
-    public static async Task AtualizarValorAsync(AppDbContext db, Mesa mesa)
+    public static async Task AtualizarValorAsync(AppDbContext db, Mesa mesa, PerfilEstabelecimento perfil)
     {
         await db.SaveChangesAsync();
         var comandas = await ComandasAbertasAsync(db, mesa.Id);
-        mesa.ValorTotalAtual = Math.Max(0, CalculoConta.Calcular(comandas).Saldo);
+        mesa.ValorTotalAtual = Math.Max(0, CalculoConta.Calcular(comandas, perfil).Saldo);
         await db.SaveChangesAsync();
     }
 
     /// <summary>Impede que um cancelamento/transferência deixe a comanda com mais pagamentos que consumo.</summary>
-    public static void GarantirSaldoNaoNegativo(Comanda comanda)
+    public static void GarantirSaldoNaoNegativo(Comanda comanda, PerfilEstabelecimento perfil)
     {
-        if (CalculoConta.Calcular(comanda).Saldo < 0)
+        if (CalculoConta.Calcular(comanda, perfil).Saldo < 0)
         {
             throw new RegraNegocioException(
                 $"A {comanda.Descricao} ficaria com pagamentos maiores que o consumo. Estorne um pagamento antes.");
         }
     }
 
-    public static void FecharComanda(AppDbContext db, Comanda comanda, Mesa mesa, int? usuarioId)
+    public static void FecharComanda(
+        AppDbContext db,
+        Comanda comanda,
+        Mesa mesa,
+        int? usuarioId,
+        PerfilEstabelecimento perfil)
     {
-        var resumo = CalculoConta.Calcular(comanda);
+        var resumo = CalculoConta.Calcular(comanda, perfil);
         var temMovimento = resumo.Total > 0 || comanda.Pagamentos.Any(p => !p.Estornado);
         EstoqueService.BaixarComanda(db, comanda, usuarioId);
         comanda.Status = temMovimento ? StatusComanda.Fechada : StatusComanda.Cancelada;

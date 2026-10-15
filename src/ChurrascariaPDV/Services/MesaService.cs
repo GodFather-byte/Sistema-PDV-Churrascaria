@@ -60,6 +60,8 @@ public record MesaDetalhe(
     DateTime? DataHoraAbertura,
     int QuantidadePessoas,
     int CapacidadeLugares,
+    decimal PercentualTaxaServico,
+    bool TaxaServicoOpcionalPorComanda,
     IReadOnlyList<ComandaDetalhe> Comandas,
     ResumoConta Resumo)
 {
@@ -98,10 +100,12 @@ public class MesaService(
             .Where(c => c.MesaId == mesaId && c.Status == StatusComanda.Aberta)
             .OrderBy(c => c.CodigoNumero)
             .ToListAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
 
-        var detalhes = comandas.Select(MapearComanda).ToList();
+        var detalhes = comandas.Select(comanda => MapearComanda(comanda, perfil)).ToList();
         return new MesaDetalhe(mesa.Id, mesa.Numero, mesa.Status, mesa.DataHoraAbertura, mesa.QuantidadePessoas,
-            mesa.CapacidadeLugares, detalhes, CalculoConta.Calcular(comandas));
+            mesa.CapacidadeLugares, perfil.PercentualTaxaServico, perfil.TaxaServicoOpcionalPorComanda,
+            detalhes, CalculoConta.Calcular(comandas, perfil));
     }
 
     public async Task<int?> ObterIdPorNumeroAsync(int numero)
@@ -183,6 +187,12 @@ public class MesaService(
     public async Task DefinirTaxaServicoAsync(int mesaId, int? comandaId, bool cobrar)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
+        if (!perfil.TaxaServicoOpcionalPorComanda)
+        {
+            throw new RegraNegocioException("A taxa de serviço não pode ser alterada por comanda neste perfil.");
+        }
+
         var mesa = await ContaMesa.ObterMesaAsync(db, mesaId);
         var comandas = (await ContaMesa.ComandasAbertasAsync(db, mesaId))
             .Where(c => comandaId is null || c.Id == comandaId)
@@ -195,10 +205,10 @@ public class MesaService(
         foreach (var comanda in comandas)
         {
             comanda.CobrarTaxaServico = cobrar;
-            ContaMesa.GarantirSaldoNaoNegativo(comanda);
+            ContaMesa.GarantirSaldoNaoNegativo(comanda, perfil);
         }
 
-        await ContaMesa.AtualizarValorAsync(db, mesa);
+        await ContaMesa.AtualizarValorAsync(db, mesa, perfil);
         await notificador.NotificarAsync(mesa.Id);
     }
 
@@ -206,6 +216,7 @@ public class MesaService(
     public async Task<bool> SolicitarContaAsync(int mesaId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var mesa = await ContaMesa.ObterMesaAsync(db, mesaId);
         var comandas = await ContaMesa.ComandasAbertasAsync(db, mesaId);
         if (mesa.Status is StatusMesa.Livre or StatusMesa.AguardandoLimpeza || !comandas.Any(c => c.Pedidos.SelectMany(p => p.Itens).Any(i => !i.Cancelado)))
@@ -214,16 +225,17 @@ public class MesaService(
         }
 
         mesa.Status = StatusMesa.ContaSolicitada;
-        await ContaMesa.AtualizarValorAsync(db, mesa);
+        await ContaMesa.AtualizarValorAsync(db, mesa, perfil);
         await notificador.NotificarAsync(mesa.Id);
 
-        return await ImprimirPreContaAsync(mesa, comandas);
+        return await ImprimirPreContaAsync(mesa, comandas, perfil);
     }
 
     /// <summary>Reimprime a conferência sem alterar o status da mesa.</summary>
     public async Task<bool> ReimprimirPreContaAsync(int mesaId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var mesa = await ContaMesa.ObterMesaAsync(db, mesaId);
         var comandas = await ContaMesa.ComandasAbertasAsync(db, mesaId);
         if (comandas.Count == 0)
@@ -231,7 +243,7 @@ public class MesaService(
             throw new RegraNegocioException($"A mesa {mesa.Numero} não tem conta aberta.");
         }
 
-        return await ImprimirPreContaAsync(mesa, comandas);
+        return await ImprimirPreContaAsync(mesa, comandas, perfil);
     }
 
     /// <summary>Move os clientes (todas as comandas abertas) de uma mesa para outra, juntando as contas se o destino estiver ocupado.</summary>
@@ -243,6 +255,7 @@ public class MesaService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         await using var transacao = await db.Database.BeginTransactionAsync();
 
         var origem = await ContaMesa.ObterMesaAsync(db, mesaOrigemId);
@@ -312,7 +325,7 @@ public class MesaService(
         }
 
         ContaMesa.Desocupar(origem, StatusMesa.AguardandoLimpeza);
-        await ContaMesa.AtualizarValorAsync(db, destino);
+        await ContaMesa.AtualizarValorAsync(db, destino, perfil);
         await transacao.CommitAsync();
         await notificador.NotificarAsync(origem.Id, destino.Id);
     }
@@ -322,21 +335,27 @@ public class MesaService(
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         await using var transacao = await db.Database.BeginTransactionAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var mesa = await ContaMesa.ObterMesaAsync(db, mesaId);
         var comandas = await ContaMesa.ComandasAbertasAsync(db, mesaId);
-        var resumo = CalculoConta.Calcular(comandas);
+        var resumo = CalculoConta.Calcular(comandas, perfil);
         if (resumo.Saldo > 0)
         {
             throw new RegraNegocioException($"A mesa {mesa.Numero} ainda deve {TicketsImpressao.Moeda(resumo.Saldo)}.");
         }
 
-        Finalizar(db, mesa, comandas, usuarioId);
+        Finalizar(db, mesa, comandas, usuarioId, perfil);
         await db.SaveChangesAsync();
         await transacao.CommitAsync();
         await notificador.NotificarAsync(mesa.Id);
     }
 
-    internal static void Finalizar(AppDbContext db, Mesa mesa, IEnumerable<Comanda> comandas, int? usuarioId)
+    internal static void Finalizar(
+        AppDbContext db,
+        Mesa mesa,
+        IEnumerable<Comanda> comandas,
+        int? usuarioId,
+        PerfilEstabelecimento perfil)
     {
         var houveConsumo = false;
         foreach (var comanda in comandas)
@@ -344,7 +363,7 @@ public class MesaService(
             houveConsumo |= comanda.Pedidos.SelectMany(p => p.Itens).Any() || comanda.Pagamentos.Any(p => !p.Estornado);
             if (comanda.Status == StatusComanda.Aberta)
             {
-                ContaMesa.FecharComanda(db, comanda, mesa, usuarioId);
+                ContaMesa.FecharComanda(db, comanda, mesa, usuarioId, perfil);
             }
         }
 
@@ -365,7 +384,10 @@ public class MesaService(
         await notificador.NotificarAsync(mesa.Id);
     }
 
-    private async Task<bool> ImprimirPreContaAsync(Mesa mesa, IReadOnlyList<Comanda> comandas)
+    private async Task<bool> ImprimirPreContaAsync(
+        Mesa mesa,
+        IReadOnlyList<Comanda> comandas,
+        PerfilEstabelecimento perfil)
     {
         var ticket = comandas
             .Select(c => new ComandaTicketConta(
@@ -376,23 +398,23 @@ public class MesaService(
                     .Select(g => new LinhaTicketConta(g.Sum(i => i.Quantidade), g.Key.Nome, g.Key.PrecoUnitarioHistorico,
                         g.Sum(i => i.ValorTotal), null))
                     .ToList(),
-                CalculoConta.Calcular(c)))
+                CalculoConta.Calcular(c, perfil)))
             .Where(c => c.Itens.Count > 0 || c.Resumo.Pago > 0)
             .ToList();
 
-        var documento = TicketsImpressao.PreConta(impressao.NovoDocumento(), impressao.Configuracao.NomeEstabelecimento,
+        var documento = TicketsImpressao.PreConta(impressao.NovoDocumento(perfil), perfil.Nome,
             mesa.Numero, mesa.DataHoraAbertura, mesa.QuantidadePessoas, ticket);
         return await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Pré-conta mesa {mesa.Numero}", documento);
     }
 
-    private static ComandaDetalhe MapearComanda(Comanda comanda) => new(
+    private static ComandaDetalhe MapearComanda(Comanda comanda, PerfilEstabelecimento perfil) => new(
         comanda.Id,
         comanda.CodigoNumero,
         comanda.Descricao,
         comanda.NomeCliente,
         comanda.ContaGeral,
         comanda.CobrarTaxaServico,
-        CalculoConta.Calcular(comanda),
+        CalculoConta.Calcular(comanda, perfil),
         comanda.Pedidos
             .SelectMany(p => p.Itens.Select(i => new ItemConsumo(
                 i.Id, p.Id, comanda.Id, i.ProdutoId, i.Produto.Nome, i.Produto.SetorImpressao, i.Quantidade,

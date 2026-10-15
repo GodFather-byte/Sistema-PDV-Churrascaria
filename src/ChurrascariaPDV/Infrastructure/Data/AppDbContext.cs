@@ -20,10 +20,30 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MovimentacaoCaixa> MovimentacoesCaixa => Set<MovimentacaoCaixa>();
     public DbSet<MovimentacaoEstoque> MovimentacoesEstoque => Set<MovimentacaoEstoque>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+    public DbSet<PerfilEstabelecimento> PerfisEstabelecimento => Set<PerfilEstabelecimento>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<PerfilEstabelecimento>(entity =>
+        {
+            entity.Property(perfil => perfil.Tipo).HasConversion<string>();
+            entity.Property(perfil => perfil.Nome).HasMaxLength(120).IsRequired();
+            entity.Property(perfil => perfil.Endereco).HasMaxLength(250).IsRequired();
+            entity.Property(perfil => perfil.PercentualTaxaServico).HasPrecision(5, 2);
+            entity.Property(perfil => perfil.LarguraTicket).HasDefaultValue(48);
+            entity.HasData(new PerfilEstabelecimento
+            {
+                Id = PerfilEstabelecimento.IdPadrao,
+                Tipo = Domain.Enums.TipoEstabelecimento.Churrascaria,
+                Nome = "CHURRASCARIA",
+                Endereco = string.Empty,
+                PercentualTaxaServico = 10m,
+                TaxaServicoOpcionalPorComanda = true,
+                LarguraTicket = 48
+            });
+        });
 
         modelBuilder.Entity<Mesa>(entity =>
         {

@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using ChurrascariaPDV.Domain.Entities;
 using ChurrascariaPDV.Domain.Enums;
 using Microsoft.Extensions.Options;
 
@@ -12,7 +13,7 @@ public class ImpressaoService(
 {
     public ImpressaoOptions Configuracao => options.CurrentValue;
 
-    public DocumentoEscPos NovoDocumento() => new(Configuracao.LarguraColunas);
+    public DocumentoEscPos NovoDocumento(PerfilEstabelecimento perfil) => new(perfil.LarguraTicket);
 
     /// <summary>Retorna verdadeiro quando o ticket foi entregue (ou simulado). Nunca lança exceção.</summary>
     public async Task<bool> ImprimirAsync(SetorImpressao setor, string titulo, DocumentoEscPos documento, CancellationToken cancellationToken = default)

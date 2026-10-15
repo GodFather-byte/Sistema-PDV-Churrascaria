@@ -28,6 +28,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
         await using var db = await dbFactory.CreateDbContextAsync();
         await using var transacao = await db.Database.BeginTransactionAsync();
 
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var turno = await db.TurnosCaixa.FirstOrDefaultAsync(t => t.DataHoraFechamento == null)
                     ?? throw new RegraNegocioException("Abra o caixa (turno) antes de receber pagamentos.");
         var mesa = await ContaMesa.ObterMesaAsync(db, novo.MesaId);
@@ -41,7 +42,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
             throw new RegraNegocioException("A comanda selecionada não está aberta nesta mesa.");
         }
 
-        var saldoAlvo = alvos.Sum(c => Math.Max(0, CalculoConta.Calcular(c).Saldo));
+        var saldoAlvo = alvos.Sum(c => Math.Max(0, CalculoConta.Calcular(c, perfil).Saldo));
         if (saldoAlvo <= 0)
         {
             throw new RegraNegocioException("Não há saldo a receber.");
@@ -65,7 +66,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
                 break;
             }
 
-            var conta = CalculoConta.Calcular(comanda);
+            var conta = CalculoConta.Calcular(comanda, perfil);
             var parte = Math.Min(restante, Math.Max(0, conta.Saldo));
             if (parte <= 0)
             {
@@ -91,23 +92,23 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
         // Comanda individual quitada é encerrada: o cliente pagou a parte dele e pode ir embora.
         foreach (var comanda in alvos.Where(c => !c.ContaGeral))
         {
-            var conta = CalculoConta.Calcular(comanda);
+            var conta = CalculoConta.Calcular(comanda, perfil);
             if (conta.Saldo <= 0 && conta.Total > 0)
             {
-                ContaMesa.FecharComanda(db, comanda, mesa, novo.UsuarioId);
+                ContaMesa.FecharComanda(db, comanda, mesa, novo.UsuarioId, perfil);
             }
         }
 
-        var saldoMesa = CalculoConta.Calcular(comandas).Saldo;
+        var saldoMesa = CalculoConta.Calcular(comandas, perfil).Saldo;
         var finalizada = saldoMesa <= 0;
         if (finalizada)
         {
-            MesaService.Finalizar(db, mesa, comandas, novo.UsuarioId);
+            MesaService.Finalizar(db, mesa, comandas, novo.UsuarioId, perfil);
             await db.SaveChangesAsync();
         }
         else
         {
-            await ContaMesa.AtualizarValorAsync(db, mesa);
+            await ContaMesa.AtualizarValorAsync(db, mesa, perfil);
         }
 
         await transacao.CommitAsync();
@@ -125,6 +126,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
 
         await using var db = await dbFactory.CreateDbContextAsync();
         await UsuarioService.ValidarGerenteAsync(db, pinGerente);
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var pagamento = await db.Pagamentos
             .Include(p => p.Comanda)
             .Include(p => p.TurnoCaixa)
@@ -150,7 +152,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
         pagamento.Estornado = true;
         pagamento.DataHoraEstorno = DateTime.Now;
         pagamento.MotivoEstorno = motivo.Trim()[..Math.Min(250, motivo.Trim().Length)];
-        await ContaMesa.AtualizarValorAsync(db, pagamento.Mesa);
+        await ContaMesa.AtualizarValorAsync(db, pagamento.Mesa, perfil);
         await notificador.NotificarAsync(pagamento.MesaId);
     }
 }

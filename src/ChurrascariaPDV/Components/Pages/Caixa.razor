@@ -204,7 +204,10 @@
                         <button type="button" class="btn btn-acao" disabled="@(!MesaAberta)" @onclick="AbrirTransferirMesa"><kbd>F3</kbd> Transferir Mesa</button>
                         <button type="button" class="btn btn-acao" disabled="@(ItemSelecionadoAtivo is null)" @onclick="AbrirTransferirItem"><kbd>F4</kbd> Transferir Item</button>
                         <button type="button" class="btn btn-acao" disabled="@(!_detalhe.TemConsumo)" @onclick="ImprimirPreContaAsync"><kbd>F6</kbd> Imprimir Pré-Conta</button>
-                        <button type="button" class="btn btn-acao" disabled="@(_detalhe.Comandas.Count == 0)" @onclick="AlternarTaxaAsync"><kbd>F7</kbd> @(TaxaAtiva ? "Desativar 10%" : "Ativar 10%")</button>
+                        @if (_detalhe.TaxaServicoOpcionalPorComanda)
+                        {
+                            <button type="button" class="btn btn-acao" disabled="@(_detalhe.Comandas.Count == 0)" @onclick="AlternarTaxaAsync"><kbd>F7</kbd> @(TaxaAtiva ? "Desativar taxa" : "Ativar taxa")</button>
+                        }
                         <button type="button" class="btn btn-acao perigo" disabled="@(ItemSelecionadoAtivo is null)" @onclick="AbrirCancelamento"><kbd>F8</kbd> Cancelar Item (PIN Gerente)</button>
                         <button type="button" class="btn btn-acao" @onclick="AbrirNovaComanda"><kbd>F12</kbd> Nova Comanda</button>
                         <button type="button" class="btn btn-acao" disabled="@(ItemSelecionado is null)" @onclick="ReimprimirPedidoAsync">Reimprimir Pedido</button>
@@ -215,10 +218,17 @@
                             <div class="titulo">@(comandaFiltro?.Descricao ?? "Mesa inteira")</div>
                             <div><span>Subtotal dos itens</span><span>@Formato.Moeda(resumoAlvo.Subtotal)</span></div>
                             <div>
-                                <label class="taxa-toggle">
-                                    <input type="checkbox" checked="@TaxaAtiva" disabled="@(_detalhe.Comandas.Count == 0)" @onchange="AlternarTaxaAsync" />
-                                    Taxa de serviço (10%)
-                                </label>
+                                @if (_detalhe.TaxaServicoOpcionalPorComanda)
+                                {
+                                    <label class="taxa-toggle">
+                                        <input type="checkbox" checked="@TaxaAtiva" disabled="@(_detalhe.Comandas.Count == 0)" @onchange="AlternarTaxaAsync" />
+                                        Taxa de serviço (@_detalhe.PercentualTaxaServico.ToString("0.##")%)
+                                    </label>
+                                }
+                                else
+                                {
+                                    <span>Taxa de serviço (@_detalhe.PercentualTaxaServico.ToString("0.##")%)</span>
+                                }
                                 <span>@Formato.Moeda(resumoAlvo.TaxaServico)</span>
                             </div>
                             <div><span>Total</span><span>@Formato.Moeda(resumoAlvo.Total)</span></div>

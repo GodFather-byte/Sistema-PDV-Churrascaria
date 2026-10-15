@@ -13,6 +13,7 @@ public record CancelamentoRelatorio(DateTime DataHora, int Mesa, string Produto,
 public record RelatorioVendas(
     DateTime Inicio,
     DateTime Fim,
+    decimal PercentualTaxaServico,
     IReadOnlyList<TotalPorMeio> PorMeio,
     decimal TotalRecebido,
     decimal TotalTaxaServico,
@@ -27,6 +28,7 @@ public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
     public async Task<RelatorioVendas> GerarAsync(DateTime inicio, DateTime fim)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
+        var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
 
         var pagamentos = await db.Pagamentos.AsNoTracking()
             .Where(p => !p.Estornado && p.DataHora >= inicio && p.DataHora < fim)
@@ -67,7 +69,8 @@ public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
                 g.Key,
                 g.Select(i => i.PedidoId).Distinct().Count(),
                 g.Sum(i => i.ValorTotal),
-                g.Where(i => i.Pedido.Comanda.CobrarTaxaServico).Sum(i => CalculoConta.CalcularTaxa(i.ValorTotal, true))))
+                g.Sum(i => CalculoConta.CalcularTaxa(
+                    i.ValorTotal, i.Pedido.Comanda.CobrarTaxaServico, perfil)))
             .OrderByDescending(v => v.ValorItens)
             .ToList();
 
@@ -89,6 +92,7 @@ public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
         return new RelatorioVendas(
             inicio,
             fim,
+            perfil.PercentualTaxaServico,
             porMeio,
             totalRecebido,
             pagamentos.Sum(p => p.ValorTaxaServicoIncluso),

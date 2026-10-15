@@ -23,7 +23,7 @@ public record ItemConsumo(
     int ComandaId,
     int ProdutoId,
     string Produto,
-    SetorImpressao Setor,
+    SetorImpressao? Setor,
     decimal Quantidade,
     decimal PrecoUnitario,
     decimal Total,
@@ -405,7 +405,9 @@ public class MesaService(
         var documento = TicketsImpressao.PreConta(impressao.NovoDocumento(perfil), perfil.Nome,
             mesa.Numero, mesa.DataHoraAbertura, mesa.QuantidadePessoas, ticket,
             perfil.PercentualTaxaServico, perfil.TaxaServicoOpcionalPorComanda);
-        return await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Pré-conta mesa {mesa.Numero}", documento);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var setor = await SetorImpressaoService.ObterSetorContasAsync(db);
+        return await impressao.ImprimirAsync(setor, $"Pré-conta mesa {mesa.Numero}", documento);
     }
 
     private static ComandaDetalhe MapearComanda(Comanda comanda, PerfilEstabelecimento perfil) => new(

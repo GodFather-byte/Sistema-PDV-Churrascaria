@@ -9,7 +9,8 @@ public class Produto
     public decimal Preco { get; set; }
     public int CategoriaId { get; set; }
     public TipoItem TipoItem { get; set; }
-    public SetorImpressao SetorImpressao { get; set; }
+    public string? SetorImpressaoId { get; set; }
+    public SetorImpressao? SetorImpressao { get; set; }
     public bool Ativo { get; set; } = true;
     public bool ControlaEstoque { get; set; }
     public decimal QuantidadeEstoque { get; set; }

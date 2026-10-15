@@ -4,6 +4,7 @@ using ChurrascariaPDV.Services;
 using ChurrascariaPDV.Services.Impressao;
 using ChurrascariaPDV.Services.Notificacoes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,11 +34,17 @@ builder.Services.AddScoped<PagamentoService>();
 builder.Services.AddScoped<CaixaService>();
 builder.Services.AddScoped<RelatorioService>();
 builder.Services.AddScoped<PerfilEstabelecimentoService>();
+builder.Services.AddScoped<SetorImpressaoService>();
 builder.Services.AddScoped<SessaoUsuario>();
 
 var app = builder.Build();
 
 await BancoDeDados.PrepararAsync(app.Services, app.Logger);
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    await scope.ServiceProvider.GetRequiredService<SetorImpressaoService>()
+        .ImportarConfiguracaoLegadaAsync(scope.ServiceProvider.GetRequiredService<IOptions<ImpressaoOptions>>().Value);
+}
 
 if (!app.Environment.IsDevelopment())
 {

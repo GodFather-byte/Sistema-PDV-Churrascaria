@@ -1,4 +1,5 @@
 using System.Globalization;
+using ChurrascariaPDV.Domain.Entities;
 using ChurrascariaPDV.Domain.Enums;
 
 namespace ChurrascariaPDV.Services.Impressao;
@@ -18,14 +19,7 @@ public static class TicketsImpressao
 
     public static string Quantidade(decimal quantidade) => quantidade.ToString("0.###", PtBr);
 
-    public static string NomeSetor(SetorImpressao setor) => setor switch
-    {
-        SetorImpressao.BarCopa => "BAR / COPA",
-        SetorImpressao.Cozinha => "COZINHA",
-        SetorImpressao.Churrasqueira => "CHURRASQUEIRA",
-        SetorImpressao.Caixa => "CAIXA",
-        _ => "SEM IMPRESSÃO"
-    };
+    public static string NomeSetor(SetorImpressao setor) => setor.Nome.ToUpper(PtBr);
 
     public static DocumentoEscPos Producao(
         DocumentoEscPos doc,
@@ -53,11 +47,10 @@ public static class TicketsImpressao
 
         foreach (var item in itens)
         {
-            doc.Texto($"{Quantidade(item.Quantidade)} x {item.Produto}", negrito: true, grande: setor != SetorImpressao.BarCopa);
+            doc.Texto($"{Quantidade(item.Quantidade)} x {item.Produto}", negrito: true, grande: setor.ItensEmDestaque);
             if (!string.IsNullOrWhiteSpace(item.Observacoes))
             {
-                // Na churrasqueira o ponto da carne precisa saltar aos olhos.
-                var destaque = setor == SetorImpressao.Churrasqueira;
+                var destaque = setor.ObservacoesEmDestaque;
                 doc.Texto($"  >> {(destaque ? item.Observacoes.ToUpper(PtBr) : item.Observacoes)}", negrito: true, grande: destaque);
             }
         }

@@ -37,7 +37,7 @@ public sealed class AmbienteTeste : IAsyncDisposable
         _scope = provider.CreateAsyncScope();
     }
 
-    public static async Task<AmbienteTeste> CriarAsync()
+    public static async Task<AmbienteTeste> CriarAsync(Action<ImpressaoOptions>? configurarImpressao = null)
     {
         var conexao = new SqliteConnection("Data Source=:memory:");
         await conexao.OpenAsync();
@@ -46,7 +46,11 @@ public sealed class AmbienteTeste : IAsyncDisposable
         services.AddLogging();
         services.AddSignalR();
         services.AddDbContextFactory<AppDbContext>(o => o.UseSqlite(conexao));
-        services.Configure<ImpressaoOptions>(o => o.ModoSimulacao = true);
+        services.Configure<ImpressaoOptions>(o =>
+        {
+            o.ModoSimulacao = true;
+            configurarImpressao?.Invoke(o);
+        });
         services.AddSingleton<HistoricoImpressoes>();
         services.AddSingleton<ImpressaoService>();
         services.AddSingleton<NotificadorMesas>();
@@ -59,6 +63,7 @@ public sealed class AmbienteTeste : IAsyncDisposable
         services.AddScoped<CaixaService>();
         services.AddScoped<RelatorioService>();
         services.AddScoped<PerfilEstabelecimentoService>();
+        services.AddScoped<SetorImpressaoService>();
 
         var provider = services.BuildServiceProvider();
         await using (var db = await provider.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync())

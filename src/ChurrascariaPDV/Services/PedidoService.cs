@@ -49,6 +49,7 @@ public class PedidoService(
 
         var produtoIds = novo.Itens.Select(i => i.ProdutoId).Distinct().ToList();
         var produtos = await db.Produtos
+            .Include(p => p.SetorImpressao)
             .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.Opcoes)
             .Where(p => produtoIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id);
@@ -110,6 +111,7 @@ public class PedidoService(
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var pedido = await db.Pedidos
             .Include(p => p.Itens).ThenInclude(i => i.Produto)
+                .ThenInclude(p => p.SetorImpressao)
             .Include(p => p.Mesa)
             .Include(p => p.Comanda)
             .Include(p => p.UsuarioGarcom)
@@ -141,7 +143,8 @@ public class PedidoService(
         await using var transacao = await db.Database.BeginTransactionAsync();
         var gerente = await UsuarioService.ValidarGerenteAsync(db, pinGerente);
 
-        var item = await db.ItensPedido.Include(i => i.Produto).FirstOrDefaultAsync(i => i.Id == itemId)
+        var item = await db.ItensPedido.Include(i => i.Produto).ThenInclude(p => p.SetorImpressao)
+            .FirstOrDefaultAsync(i => i.Id == itemId)
                    ?? throw new RegraNegocioException("Item não encontrado.");
         if (item.Cancelado)
         {
@@ -192,12 +195,12 @@ public class PedidoService(
         await ContaMesa.AtualizarValorAsync(db, pedido.Mesa, perfil);
         await transacao.CommitAsync();
 
-        if (item.Produto.SetorImpressao != SetorImpressao.Nenhum && pedido.ImpressoNosSetores)
+        if (item.Produto.SetorImpressao is { } setor && pedido.ImpressoNosSetores)
         {
-            var documento = TicketsImpressao.Cancelamento(impressao.NovoDocumento(perfil), item.Produto.SetorImpressao,
+            var documento = TicketsImpressao.Cancelamento(impressao.NovoDocumento(perfil), setor,
                 pedido.Mesa.Numero, comanda.Descricao, gerente.Nome, cancelado.MotivoCancelamento,
                 new LinhaTicketProducao(quantidade, item.Produto.Nome, item.ObservacoesModificadores));
-            await impressao.ImprimirAsync(item.Produto.SetorImpressao, $"Cancelamento mesa {pedido.Mesa.Numero}", documento);
+            await impressao.ImprimirAsync(setor, $"Cancelamento mesa {pedido.Mesa.Numero}", documento);
         }
 
         await notificador.NotificarAsync(pedido.MesaId);
@@ -338,11 +341,10 @@ public class PedidoService(
         var impressos = new List<SetorImpressao>();
         var falhas = new List<SetorImpressao>();
 
-        // Rodízio (setor Nenhum) só entra no saldo da mesa: não gasta papel na produção.
         var porSetor = pedido.Itens
-            .Where(i => !i.Cancelado && i.Produto.SetorImpressao != SetorImpressao.Nenhum)
-            .GroupBy(i => i.Produto.SetorImpressao)
-            .OrderBy(g => g.Key);
+            .Where(i => !i.Cancelado && i.Produto.SetorImpressao is not null)
+            .GroupBy(i => i.Produto.SetorImpressao!)
+            .OrderBy(g => g.Key.Ordem).ThenBy(g => g.Key.Nome);
 
         foreach (var grupo in porSetor)
         {

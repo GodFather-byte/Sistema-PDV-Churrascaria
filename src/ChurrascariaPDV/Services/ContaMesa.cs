@@ -10,6 +10,7 @@ internal static class ContaMesa
 {
     public static IQueryable<Comanda> ComandasCompletas(AppDbContext db) => db.Comandas
         .Include(c => c.Pedidos).ThenInclude(p => p.Itens).ThenInclude(i => i.Produto)
+            .ThenInclude(p => p.SetorImpressao)
         .Include(c => c.Pedidos).ThenInclude(p => p.UsuarioGarcom)
         .Include(c => c.Pagamentos)
         .AsSplitQuery();

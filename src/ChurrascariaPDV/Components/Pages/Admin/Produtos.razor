@@ -1,5 +1,6 @@
 @page "/admin/produtos"
 @inject CardapioService CardapioService
+@inject SetorImpressaoService Setores
 
 <PageTitle>Cardápio</PageTitle>
 
@@ -99,10 +100,11 @@
                     </div>
                     <div class="col">
                         <label class="form-label">Imprimir em</label>
-                        <select class="form-select" @bind="_produto.SetorImpressao" disabled="@(_produto.TipoItem == TipoItem.Rodizio)">
-                            @foreach (var setor in Enum.GetValues<SetorImpressao>().Where(s => s != SetorImpressao.Caixa))
+                        <select class="form-select" @bind="_produto.SetorImpressaoId" disabled="@(_produto.TipoItem == TipoItem.Rodizio)">
+                            <option value="">Sem impressão</option>
+                            @foreach (var setor in _setores)
                             {
-                                <option value="@setor">@Formato.Setor(setor)</option>
+                                <option value="@setor.Id">@setor.Nome</option>
                             }
                         </select>
                     </div>
@@ -178,6 +180,7 @@
     private List<Produto> _produtos = [];
     private List<CategoriaProduto> _categorias = [];
     private List<GrupoModificador> _grupos = [];
+    private List<SetorImpressao> _setores = [];
 
     private Produto? _produto;
     private string? _precoProduto;
@@ -195,13 +198,14 @@
         _produtos = await CardapioService.ListarProdutosAsync();
         _categorias = await CardapioService.ListarCategoriasAsync();
         _grupos = await CardapioService.ListarGruposAsync();
+        _setores = await Setores.ListarAsync();
     }
 
     private void EditarProduto(Produto? produto)
     {
         _produto = produto is null
-            ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, TipoItem = TipoItem.PorcaoCozinha, SetorImpressao = SetorImpressao.Cozinha, Ativo = true }
-            : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressao = produto.SetorImpressao, Ativo = produto.Ativo, ControlaEstoque = produto.ControlaEstoque, QuantidadeEstoque = produto.QuantidadeEstoque };
+            ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, TipoItem = TipoItem.PorcaoCozinha, Ativo = true }
+            : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressaoId = produto.SetorImpressaoId, Ativo = produto.Ativo, ControlaEstoque = produto.ControlaEstoque, QuantidadeEstoque = produto.QuantidadeEstoque };
         _precoProduto = Formato.ValorEditavel(_produto.Preco);
         _gruposProduto = produto?.GruposModificadores.Select(g => g.GrupoModificadorId).ToHashSet() ?? [];
     }

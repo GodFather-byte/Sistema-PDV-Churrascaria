@@ -1,4 +1,4 @@
-using ChurrascariaPDV.Domain.Enums;
+using ChurrascariaPDV.Domain.Entities;
 
 namespace ChurrascariaPDV.Services.Impressao;
 

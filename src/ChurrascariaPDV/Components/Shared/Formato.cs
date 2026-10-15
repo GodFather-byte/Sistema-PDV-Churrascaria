@@ -1,5 +1,6 @@
 using System.Globalization;
 using ChurrascariaPDV.Domain.Enums;
+using ChurrascariaPDV.Domain.Entities;
 using ChurrascariaPDV.Services.Impressao;
 
 namespace ChurrascariaPDV.Components.Shared;
@@ -60,15 +61,7 @@ public static class Formato
         _ => tipo.ToString()
     };
 
-    public static string Setor(SetorImpressao setor) => setor switch
-    {
-        SetorImpressao.Nenhum => "Sem impressão",
-        SetorImpressao.BarCopa => "Bar / Copa",
-        SetorImpressao.Cozinha => "Cozinha",
-        SetorImpressao.Churrasqueira => "Churrasqueira",
-        SetorImpressao.Caixa => "Caixa",
-        _ => setor.ToString()
-    };
+    public static string Setor(SetorImpressao? setor) => setor?.Nome ?? "Sem impressão";
 
     public static string TipoItem(TipoItem tipo) => tipo switch
     {

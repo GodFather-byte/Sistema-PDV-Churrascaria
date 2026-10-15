@@ -16,7 +16,7 @@ public record ProdutoCardapio(
     int CategoriaId,
     string Categoria,
     TipoItem TipoItem,
-    SetorImpressao SetorImpressao,
+    SetorImpressao? SetorImpressao,
     IReadOnlyList<GrupoCardapio> Grupos)
 {
     public bool TemModificadores => Grupos.Count > 0;
@@ -32,6 +32,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         var produtos = await db.Produtos.AsNoTracking()
             .Where(p => p.Ativo)
             .Include(p => p.Categoria)
+            .Include(p => p.SetorImpressao)
             .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.Opcoes)
             .ToListAsync();
 
@@ -70,6 +71,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.Produtos.AsNoTracking()
             .Include(p => p.Categoria)
+            .Include(p => p.SetorImpressao)
             .Include(p => p.GruposModificadores)
             .OrderBy(p => p.CategoriaId).ThenBy(p => p.Nome)
             .ToListAsync();
@@ -124,6 +126,12 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             throw new RegraNegocioException("Selecione uma categoria válida.");
         }
 
+        var setorId = string.IsNullOrWhiteSpace(dados.SetorImpressaoId) ? null : dados.SetorImpressaoId;
+        if (setorId is not null && !await db.SetoresImpressao.AnyAsync(s => s.Id == setorId))
+        {
+            throw new RegraNegocioException("Selecione um setor de impressão válido.");
+        }
+
         var produto = dados.Id == 0
             ? new Produto()
             : await db.Produtos.Include(p => p.GruposModificadores).FirstOrDefaultAsync(p => p.Id == dados.Id)
@@ -133,7 +141,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         produto.Preco = CalculoConta.Arredondar(dados.Preco);
         produto.CategoriaId = dados.CategoriaId;
         produto.TipoItem = dados.TipoItem;
-        produto.SetorImpressao = dados.TipoItem == TipoItem.Rodizio ? SetorImpressao.Nenhum : dados.SetorImpressao;
+        produto.SetorImpressaoId = dados.TipoItem == TipoItem.Rodizio ? null : setorId;
         produto.Ativo = dados.Ativo;
         produto.ControlaEstoque = dados.ControlaEstoque;
 

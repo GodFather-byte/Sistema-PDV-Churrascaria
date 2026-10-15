@@ -1,0 +1,80 @@
+@page "/admin/setores"
+@inject SetorImpressaoService SetoresService
+
+<PageTitle>Setores de impressão</PageTitle>
+<AreaProtegida Area="gerencia" Titulo="Setores (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => CarregarAsync()">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>Setores de impressão</h1>
+        <button type="button" class="btn btn-brasa" @onclick="() => Editar(null)">+ Setor</button>
+    </div>
+    <Aviso Mensagem="@_aviso" Tipo="erro" OnFechar="() => _aviso = null" />
+    <div class="painel">
+        <table class="table table-dark">
+            <thead><tr><th>Nome</th><th>IP</th><th>Porta</th><th>Habilitado</th><th>Contas</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var setor in _setores)
+                {
+                    <tr>
+                        <td>@setor.Nome</td><td>@setor.Ip</td><td>@setor.Porta</td>
+                        <td>@(setor.Habilitada ? "Sim" : "Não")</td><td>@(setor.RecebeContas ? "Sim" : "Não")</td>
+                        <td><button type="button" class="btn btn-outline-light" @onclick="() => Editar(setor)">Editar</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <Modal Aberto="_editando is not null" Titulo="Setor de impressão" OnFechar="() => _editando = null">
+        <ChildContent>
+            @if (_editando is { } setor)
+            {
+                <label class="form-label">Nome</label>
+                <input class="form-control mb-2" maxlength="80" @bind="setor.Nome" />
+                <label class="form-label">IP</label>
+                <input class="form-control mb-2" maxlength="45" @bind="setor.Ip" />
+                <label class="form-label">Porta</label>
+                <input class="form-control mb-2" type="number" min="1" max="65535" @bind="setor.Porta" />
+                <label class="form-label">Ordem</label>
+                <input class="form-control mb-2" type="number" @bind="setor.Ordem" />
+                <label class="d-block"><input type="checkbox" @bind="setor.Habilitada" /> Habilitado</label>
+                <label class="d-block"><input type="checkbox" @bind="setor.RecebeContas" /> Receber pré-contas e fechamentos</label>
+                <label class="d-block"><input type="checkbox" @bind="setor.ItensEmDestaque" /> Itens em tamanho grande</label>
+                <label class="d-block"><input type="checkbox" @bind="setor.ObservacoesEmDestaque" /> Observações em destaque</label>
+            }
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-secondary" @onclick="() => _editando = null">Cancelar</button>
+            <button type="button" class="btn btn-brasa" @onclick="SalvarAsync">Salvar</button>
+        </Rodape>
+    </Modal>
+</AreaProtegida>
+
+@code {
+    private List<SetorImpressao> _setores = [];
+    private SetorImpressao? _editando;
+    private string? _aviso;
+
+    private async Task CarregarAsync() => _setores = await SetoresService.ListarAsync();
+
+    private void Editar(SetorImpressao? setor) => _editando = setor is null ? new SetorImpressao() : new SetorImpressao
+    {
+        Id = setor.Id, Nome = setor.Nome, Ip = setor.Ip, Porta = setor.Porta,
+        Habilitada = setor.Habilitada, RecebeContas = setor.RecebeContas,
+        ItensEmDestaque = setor.ItensEmDestaque, ObservacoesEmDestaque = setor.ObservacoesEmDestaque, Ordem = setor.Ordem
+    };
+
+    private async Task SalvarAsync()
+    {
+        if (_editando is null) return;
+        try
+        {
+            await SetoresService.SalvarAsync(_editando);
+            _editando = null;
+            _aviso = null;
+            await CarregarAsync();
+        }
+        catch (RegraNegocioException ex)
+        {
+            _aviso = ex.Message;
+        }
+    }
+}

@@ -167,7 +167,7 @@
                                         <td>@Formato.Hora(item.DataHora)</td>
                                         <td>
                                             @item.Produto
-                                            @if (!item.Impresso && item.Setor != SetorImpressao.Nenhum && !item.Cancelado)
+                                            @if (!item.Impresso && item.Setor is not null && !item.Cancelado)
                                             {
                                                 <span class="badge bg-danger ms-1" title="Falha ao imprimir na produção">não impresso</span>
                                             }

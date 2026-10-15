@@ -1,4 +1,5 @@
 using ChurrascariaPDV.Domain.Enums;
+using ChurrascariaPDV.Domain.Entities;
 using ChurrascariaPDV.Services;
 using Microsoft.EntityFrameworkCore;
 using static ChurrascariaPDV.Tests.AmbienteTeste;
@@ -36,16 +37,16 @@ public class PedidoServiceTests
             Item(Picanha, 1, AoPonto));
 
         Assert.True(resultado.ImpressoComSucesso);
-        Assert.Equal([SetorImpressao.BarCopa, SetorImpressao.Cozinha, SetorImpressao.Churrasqueira], resultado.SetoresImpressos);
+        Assert.Equal([SetorImpressao.BarCopa, SetorImpressao.Cozinha, SetorImpressao.Churrasqueira], resultado.SetoresImpressos.Select(s => s.Id));
 
         var tickets = ambiente.Impressoes.Listar();
         Assert.Equal(3, tickets.Count);
-        var bar = tickets.Single(t => t.Setor == SetorImpressao.BarCopa).Conteudo;
+        var bar = tickets.Single(t => t.Setor.Id == SetorImpressao.BarCopa).Conteudo;
         Assert.Contains("Chopp 500ml", bar);
         Assert.Contains("Com Gelo e Limão", bar);
         Assert.Contains("João", bar);
         Assert.DoesNotContain("Rodízio", bar);
-        var churrasqueira = tickets.Single(t => t.Setor == SetorImpressao.Churrasqueira).Conteudo;
+        var churrasqueira = tickets.Single(t => t.Setor.Id == SetorImpressao.Churrasqueira).Conteudo;
         Assert.Contains("AO PONTO", churrasqueira);
         Assert.DoesNotContain(tickets, t => t.Conteudo.Contains("Rodízio Completo"));
     }
@@ -124,7 +125,7 @@ public class PedidoServiceTests
         await ambiente.LancarAsync(1, Item(RodizioAdulto));
         await ambiente.Mesas.SolicitarContaAsync(1);
         Assert.Equal(StatusMesa.ContaSolicitada, (await ambiente.Mesas.ObterDetalheAsync(1)).Status);
-        Assert.Contains(ambiente.Impressoes.Listar(), t => t.Setor == SetorImpressao.Caixa && t.Conteudo.Contains("CONFERÊNCIA"));
+        Assert.Contains(ambiente.Impressoes.Listar(), t => t.Setor.Id == SetorImpressao.Caixa && t.Conteudo.Contains("CONFERÊNCIA"));
 
         await ambiente.LancarAsync(1, Item(Chopp));
 

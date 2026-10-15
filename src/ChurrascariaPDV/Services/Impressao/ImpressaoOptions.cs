@@ -1,5 +1,3 @@
-using ChurrascariaPDV.Domain.Enums;
-
 namespace ChurrascariaPDV.Services.Impressao;
 
 public class ImpressaoOptions
@@ -9,7 +7,8 @@ public class ImpressaoOptions
     /// <summary>Quando verdadeiro nenhum byte é enviado à rede: o ticket vai para o log e para a tela /impressoes.</summary>
     public bool ModoSimulacao { get; set; } = true;
     public int TimeoutMs { get; set; } = 3000;
-    public Dictionary<SetorImpressao, ImpressoraConfig> Impressoras { get; set; } = new();
+    // Lida apenas na importacao unica da configuracao anterior.
+    public Dictionary<string, ImpressoraConfig> Impressoras { get; set; } = new();
 }
 
 public class ImpressoraConfig

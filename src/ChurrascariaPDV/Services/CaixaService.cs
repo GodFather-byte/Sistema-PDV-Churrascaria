@@ -159,7 +159,8 @@ public class CaixaService(
         resumo = resumo with { Fechamento = turno.DataHoraFechamento, DinheiroInformado = turno.ValorFechamento };
         var documento = TicketsImpressao.FechamentoTurno(
             impressao.NovoDocumento(perfil), perfil.Nome, resumo, perfil.PercentualTaxaServico);
-        await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Fechamento do turno #{turno.Id}", documento);
+        var setor = await SetorImpressaoService.ObterSetorContasAsync(db);
+        await impressao.ImprimirAsync(setor, $"Fechamento do turno #{turno.Id}", documento);
         await notificador.NotificarAsync();
         return resumo;
     }
@@ -181,7 +182,8 @@ public class CaixaService(
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var documento = TicketsImpressao.FechamentoTurno(
             impressao.NovoDocumento(perfil), perfil.Nome, resumo, perfil.PercentualTaxaServico);
-        return await impressao.ImprimirAsync(SetorImpressao.Caixa, $"Fechamento do turno #{turnoId} (2ª via)", documento);
+        var setor = await SetorImpressaoService.ObterSetorContasAsync(db);
+        return await impressao.ImprimirAsync(setor, $"Fechamento do turno #{turnoId} (2ª via)", documento);
     }
 
     private static async Task<ResumoTurno> CalcularResumoAsync(AppDbContext db, TurnoCaixa turno)

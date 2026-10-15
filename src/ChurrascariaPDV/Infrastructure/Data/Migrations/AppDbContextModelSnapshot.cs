@@ -1075,9 +1075,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .HasPrecision(10, 3)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("SetorImpressao")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<string>("SetorImpressaoId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("SetorImpressao");
 
                     b.Property<string>("TipoItem")
                         .IsRequired()
@@ -1086,6 +1086,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoriaId");
+
+                    b.HasIndex("SetorImpressaoId");
 
                     b.ToTable("Produtos");
 
@@ -1099,7 +1101,6 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Rodízio Completo Adulto",
                             Preco = 89.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Nenhum",
                             TipoItem = "Rodizio"
                         },
                         new
@@ -1111,7 +1112,6 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Rodízio Infantil",
                             Preco = 44.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Nenhum",
                             TipoItem = "Rodizio"
                         },
                         new
@@ -1123,7 +1123,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Picanha na Tábua",
                             Preco = 119.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Churrasqueira",
+                            SetorImpressaoId = "Churrasqueira",
                             TipoItem = "CarneAlaCarte"
                         },
                         new
@@ -1135,7 +1135,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Costela no Bafo",
                             Preco = 99.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Churrasqueira",
+                            SetorImpressaoId = "Churrasqueira",
                             TipoItem = "CarneAlaCarte"
                         },
                         new
@@ -1147,7 +1147,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Polenta Frita",
                             Preco = 32.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Cozinha",
+                            SetorImpressaoId = "Cozinha",
                             TipoItem = "PorcaoCozinha"
                         },
                         new
@@ -1159,7 +1159,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Mandioca Frita",
                             Preco = 34.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Cozinha",
+                            SetorImpressaoId = "Cozinha",
                             TipoItem = "PorcaoCozinha"
                         },
                         new
@@ -1171,7 +1171,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Chopp 500ml",
                             Preco = 14.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "BarCopa",
+                            SetorImpressaoId = "BarCopa",
                             TipoItem = "Bebida"
                         },
                         new
@@ -1183,7 +1183,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Refrigerante Lata",
                             Preco = 8.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "BarCopa",
+                            SetorImpressaoId = "BarCopa",
                             TipoItem = "Bebida"
                         },
                         new
@@ -1195,7 +1195,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Suco Jarra",
                             Preco = 22.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "BarCopa",
+                            SetorImpressaoId = "BarCopa",
                             TipoItem = "Bebida"
                         },
                         new
@@ -1207,8 +1207,111 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Nome = "Petit Gateau",
                             Preco = 24.90m,
                             QuantidadeEstoque = 0m,
-                            SetorImpressao = "Cozinha",
+                            SetorImpressaoId = "Cozinha",
                             TipoItem = "Sobremesa"
+                        });
+                });
+
+            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.SetorImpressao", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ConfiguracaoLegadaImportada")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Habilitada")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Ip")
+                        .IsRequired()
+                        .HasMaxLength(45)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ItensEmDestaque")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Nome")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("ObservacoesEmDestaque")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Ordem")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Porta")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("RecebeContas")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Nome")
+                        .IsUnique();
+
+                    b.HasIndex("RecebeContas")
+                        .IsUnique()
+                        .HasFilter("\"RecebeContas\" = 1");
+
+                    b.ToTable("SetoresImpressao");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "BarCopa",
+                            ConfiguracaoLegadaImportada = false,
+                            Habilitada = true,
+                            Ip = "192.168.0.101",
+                            ItensEmDestaque = false,
+                            Nome = "Bar / Copa",
+                            ObservacoesEmDestaque = false,
+                            Ordem = 1,
+                            Porta = 9100,
+                            RecebeContas = false
+                        },
+                        new
+                        {
+                            Id = "Cozinha",
+                            ConfiguracaoLegadaImportada = false,
+                            Habilitada = true,
+                            Ip = "192.168.0.102",
+                            ItensEmDestaque = true,
+                            Nome = "Cozinha",
+                            ObservacoesEmDestaque = false,
+                            Ordem = 2,
+                            Porta = 9100,
+                            RecebeContas = false
+                        },
+                        new
+                        {
+                            Id = "Churrasqueira",
+                            ConfiguracaoLegadaImportada = false,
+                            Habilitada = true,
+                            Ip = "192.168.0.103",
+                            ItensEmDestaque = true,
+                            Nome = "Churrasqueira",
+                            ObservacoesEmDestaque = true,
+                            Ordem = 3,
+                            Porta = 9100,
+                            RecebeContas = false
+                        },
+                        new
+                        {
+                            Id = "Caixa",
+                            ConfiguracaoLegadaImportada = false,
+                            Habilitada = true,
+                            Ip = "192.168.0.100",
+                            ItensEmDestaque = true,
+                            Nome = "Caixa",
+                            ObservacoesEmDestaque = false,
+                            Ordem = 4,
+                            Porta = 9100,
+                            RecebeContas = true
                         });
                 });
 
@@ -1515,7 +1618,14 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.SetorImpressao", "SetorImpressao")
+                        .WithMany()
+                        .HasForeignKey("SetorImpressaoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Categoria");
+
+                    b.Navigation("SetorImpressao");
                 });
 
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.TurnoCaixa", b =>

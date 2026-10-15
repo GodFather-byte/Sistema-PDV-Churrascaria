@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject HistoricoImpressoes Historico
 @inject ImpressaoService Impressao
+@inject SetorImpressaoService Setores
 
 <PageTitle>Impressões</PageTitle>
 
@@ -21,9 +22,9 @@
         <p class="mb-0"><span class="badge bg-success">IMPRESSORAS ATIVAS</span> Tickets enviados via TCP (ESC/POS).</p>
     }
     <div class="d-flex flex-wrap gap-3 mt-2 small">
-        @foreach (var (setor, config) in Impressao.Configuracao.Impressoras)
+        @foreach (var setor in _setores)
         {
-            <span>@Formato.Setor(setor): <code>@config.Ip:@config.Porta</code>@(config.Habilitada ? string.Empty : " (desabilitada)")</span>
+            <span>@setor.Nome: <code>@setor.Ip:@setor.Porta</code>@(setor.Habilitada ? string.Empty : " (desabilitada)")</span>
         }
     </div>
 </div>
@@ -51,7 +52,13 @@
 </div>
 
 @code {
-    protected override void OnInitialized() => Historico.Alterado += Atualizar;
+    private List<SetorImpressao> _setores = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Historico.Alterado += Atualizar;
+        _setores = await Setores.ListarAsync();
+    }
 
     private void Atualizar() => InvokeAsync(StateHasChanged);
 

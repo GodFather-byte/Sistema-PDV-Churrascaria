@@ -25,6 +25,31 @@ public class DocumentoEscPosTests
         Assert.All(texto.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries), linha => Assert.True(linha.Length <= 10));
     }
 
+    [Theory]
+    [InlineData("Bar / Copa", false, false)]
+    [InlineData("Cozinha", true, false)]
+    [InlineData("Churrasqueira", true, true)]
+    public void ProducaoComSetorCadastradoPreservaBytesAnteriores(string nome, bool itensGrandes, bool destacar)
+    {
+        var hora = new DateTime(2026, 10, 15, 12, 0, 0);
+        var setor = new SetorImpressao { Nome = nome, ItensEmDestaque = itensGrandes, ObservacoesEmDestaque = destacar };
+        var atual = TicketsImpressao.Producao(new DocumentoEscPos(48), setor, 1, "Conta Geral", "João", hora, 1,
+            [new LinhaTicketProducao(1, "Produto", "Ao Ponto")]).ParaBytes();
+        var anterior = new DocumentoEscPos(48)
+            .Centro(nome.ToUpperInvariant(), negrito: true, grande: true)
+            .Separador('=')
+            .Texto("MESA 1", negrito: true, grande: true)
+            .Texto("Conta Geral", negrito: true)
+            .Colunas("Garçom: João", "15/10 12:00")
+            .Texto("Pedido #1")
+            .Separador()
+            .Texto("1 x Produto", negrito: true, grande: itensGrandes)
+            .Texto(destacar ? "  >> AO PONTO" : "  >> Ao Ponto", negrito: true, grande: destacar)
+            .Separador('=').ParaBytes();
+
+        Assert.Equal(anterior, atual);
+    }
+
     [Fact]
     public void LarguraPadraoDoPerfilMantemBytesEscPosExistentes()
     {

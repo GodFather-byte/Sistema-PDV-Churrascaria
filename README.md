@@ -102,17 +102,21 @@ Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em prod
 
 ## Impressoras
 
-Configure em `src/ChurrascariaPDV/appsettings.json`:
+Cadastre e edite os setores em **Gerência > Setores de impressão** (`/admin/setores`):
+nome, IP, porta, habilitado e destaque dos itens/observações. Escolha um setor para receber pré-contas e
+fechamentos. O cadastro do produto permite selecionar qualquer setor ou **Sem impressão**.
+
+Bar / Copa, Cozinha, Churrasqueira e Caixa são preservados como setores iniciais.
+Na primeira inicialização após a atualização, a configuração antiga `Impressao:Impressoras` é importada
+para o banco uma única vez; mudanças posteriores devem ser feitas pela tela, sem editar código ou JSON.
+Setores desabilitados não enviam bytes para a rede e seus tickets ficam no histórico como simulados.
+
+Somente o modo de simulação e o timeout continuam em `src/ChurrascariaPDV/appsettings.json`:
 
 ```json
 "Impressao": {
   "ModoSimulacao": true,
-  "Impressoras": {
-    "BarCopa":       { "Ip": "192.168.0.101", "Porta": 9100, "Habilitada": true },
-    "Cozinha":       { "Ip": "192.168.0.102", "Porta": 9100, "Habilitada": true },
-    "Churrasqueira": { "Ip": "192.168.0.103", "Porta": 9100, "Habilitada": true },
-    "Caixa":         { "Ip": "192.168.0.100", "Porta": 9100, "Habilitada": true }
-  }
+  "TimeoutMs": 3000
 }
 ```
 

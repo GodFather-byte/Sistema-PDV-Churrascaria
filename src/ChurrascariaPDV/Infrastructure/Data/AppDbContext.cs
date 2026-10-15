@@ -170,6 +170,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany()
                 .HasForeignKey(pagamento => pagamento.UsuarioId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(pagamento => pagamento.UsuarioGerenteEstorno)
+                .WithMany()
+                .HasForeignKey(pagamento => pagamento.UsuarioGerenteEstornoId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(pagamento => pagamento.Mesa)
                 .WithMany(mesa => mesa.Pagamentos)
                 .HasForeignKey(pagamento => pagamento.MesaId)

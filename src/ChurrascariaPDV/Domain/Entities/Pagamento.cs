@@ -18,6 +18,8 @@ public class Pagamento
     public bool Estornado { get; set; }
     public DateTime? DataHoraEstorno { get; set; }
     public string? MotivoEstorno { get; set; }
+    public int? UsuarioGerenteEstornoId { get; set; }
+    public Usuario? UsuarioGerenteEstorno { get; set; }
     public Mesa Mesa { get; set; } = null!;
     public Comanda? Comanda { get; set; }
     public TurnoCaixa? TurnoCaixa { get; set; }

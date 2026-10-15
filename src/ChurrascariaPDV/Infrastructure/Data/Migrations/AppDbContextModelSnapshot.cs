@@ -401,6 +401,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<int?>("TurnoCaixaId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("UsuarioGerenteEstornoId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("UsuarioId")
                         .HasColumnType("INTEGER");
 
@@ -423,6 +426,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.HasIndex("MesaId");
 
                     b.HasIndex("TurnoCaixaId");
+
+                    b.HasIndex("UsuarioGerenteEstornoId");
 
                     b.HasIndex("UsuarioId");
 
@@ -849,6 +854,11 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .HasForeignKey("TurnoCaixaId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.Usuario", "UsuarioGerenteEstorno")
+                        .WithMany()
+                        .HasForeignKey("UsuarioGerenteEstornoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ChurrascariaPDV.Domain.Entities.Usuario", "Usuario")
                         .WithMany()
                         .HasForeignKey("UsuarioId")
@@ -861,6 +871,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("TurnoCaixa");
 
                     b.Navigation("Usuario");
+
+                    b.Navigation("UsuarioGerenteEstorno");
                 });
 
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.Pedido", b =>

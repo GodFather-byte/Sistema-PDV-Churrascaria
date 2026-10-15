@@ -135,6 +135,12 @@ public class MesaEPagamentoTests
         var mesa = await ambiente.Mesas.ObterDetalheAsync(1);
         Assert.Equal(0, mesa.Resumo.Pago);
         Assert.Equal(mesa.Resumo.Total, mesa.Resumo.Saldo);
+
+        var relatorio = await ambiente.Servico<RelatorioService>().GerarAsync(DateTime.Today, DateTime.Today.AddDays(1));
+        var estorno = Assert.Single(relatorio.Estornos);
+        Assert.Equal(50m, estorno.Valor);
+        Assert.Equal("Lançado na mesa errada", estorno.Motivo);
+        Assert.False(string.IsNullOrEmpty(estorno.Gerente));
     }
 
     [Fact]

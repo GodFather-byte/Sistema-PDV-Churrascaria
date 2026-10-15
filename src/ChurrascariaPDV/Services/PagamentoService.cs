@@ -11,7 +11,7 @@ public record NovoPagamento(int MesaId, int? ComandaId, MeioPagamento Meio, deci
 
 public record ResultadoPagamento(decimal ValorAbatido, decimal Troco, decimal SaldoRestanteMesa, bool MesaFinalizada);
 
-public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, NotificadorMesas notificador)
+public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, NotificadorMesas notificador, ProtecaoPin? protecao = null)
 {
     /// <summary>
     /// Registra um pagamento parcial ou total. Sem comanda informada o valor abate o saldo da mesa inteira,
@@ -126,7 +126,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        await UsuarioService.ValidarGerenteAsync(db, pinGerente);
+        var gerente = await UsuarioService.ValidarGerenteAsync(db, pinGerente, protecao);
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var pagamento = await db.Pagamentos
             .Include(p => p.Comanda)
@@ -153,6 +153,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
         pagamento.Estornado = true;
         pagamento.DataHoraEstorno = DateTime.Now;
         pagamento.MotivoEstorno = motivo.Trim()[..Math.Min(250, motivo.Trim().Length)];
+        pagamento.UsuarioGerenteEstornoId = gerente.Id;
         await ContaMesa.AtualizarValorAsync(db, pagamento.Mesa, perfil);
         await notificador.NotificarAsync(pagamento.MesaId);
     }

@@ -85,6 +85,23 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="painel mt-3">
+            <h2>Estornos de pagamento</h2>
+            <table class="table table-dark table-sm">
+                <thead><tr><th>Data</th><th>Mesa</th><th>Forma</th><th class="text-end">Valor</th><th>Motivo</th><th>Autorizado por</th><th>Recebido por</th></tr></thead>
+                <tbody>
+                    @foreach (var e in r.Estornos)
+                    {
+                        <tr><td>@Formato.DataHora(e.DataHora)</td><td>@e.Mesa</td><td>@Formato.Meio(e.Meio)</td><td class="text-end">@Formato.Moeda(e.Valor)</td><td>@e.Motivo</td><td>@e.Gerente</td><td>@e.Operador</td></tr>
+                    }
+                    @if (r.Estornos.Count == 0)
+                    {
+                        <tr><td colspan="7" class="text-muted">Nenhum estorno no período.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 </AreaProtegida>
 

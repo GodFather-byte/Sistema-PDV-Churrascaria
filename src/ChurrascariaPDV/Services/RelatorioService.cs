@@ -10,6 +10,8 @@ public record VendaGarcom(string Garcom, int Pedidos, decimal ValorItens, decima
 
 public record CancelamentoRelatorio(DateTime DataHora, int Mesa, string Produto, decimal Quantidade, decimal Valor, string? Motivo, string? Gerente, string Garcom);
 
+public record EstornoRelatorio(DateTime DataHora, int Mesa, MeioPagamento Meio, decimal Valor, string? Motivo, string? Gerente, string? Operador);
+
 public record RelatorioVendas(
     DateTime Inicio,
     DateTime Fim,
@@ -21,7 +23,8 @@ public record RelatorioVendas(
     decimal TicketMedio,
     IReadOnlyList<VendaProduto> Produtos,
     IReadOnlyList<VendaGarcom> Garcons,
-    IReadOnlyList<CancelamentoRelatorio> Cancelamentos);
+    IReadOnlyList<CancelamentoRelatorio> Cancelamentos,
+    IReadOnlyList<EstornoRelatorio> Estornos);
 
 public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
 {
@@ -88,6 +91,17 @@ public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
                 i.Pedido.UsuarioGarcom.Nome))
             .ToList();
 
+        var estornos = (await db.Pagamentos.AsNoTracking()
+                .Include(p => p.Mesa)
+                .Include(p => p.Usuario)
+                .Include(p => p.UsuarioGerenteEstorno)
+                .Where(p => p.Estornado && p.DataHoraEstorno >= inicio && p.DataHoraEstorno < fim)
+                .ToListAsync())
+            .OrderByDescending(p => p.DataHoraEstorno)
+            .Select(p => new EstornoRelatorio(p.DataHoraEstorno!.Value, p.Mesa.Numero, p.MeioPagamento, p.ValorPago,
+                p.MotivoEstorno, p.UsuarioGerenteEstorno?.Nome, p.Usuario?.Nome))
+            .ToList();
+
         var totalRecebido = pagamentos.Sum(p => p.ValorPago);
         return new RelatorioVendas(
             inicio,
@@ -100,6 +114,7 @@ public class RelatorioService(IDbContextFactory<AppDbContext> dbFactory)
             fechamentos.Count == 0 ? 0 : CalculoConta.Arredondar(fechamentos.Sum(f => f.Total) / fechamentos.Count),
             produtos,
             garcons,
-            cancelamentos);
+            cancelamentos,
+            estornos);
     }
 }

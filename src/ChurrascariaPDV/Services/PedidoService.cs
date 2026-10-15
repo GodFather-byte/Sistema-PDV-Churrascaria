@@ -19,7 +19,8 @@ public record ResultadoPedido(int PedidoId, IReadOnlyList<SetorImpressao> Setore
 public class PedidoService(
     IDbContextFactory<AppDbContext> dbFactory,
     ImpressaoService impressao,
-    NotificadorMesas notificador)
+    NotificadorMesas notificador,
+    ProtecaoPin? protecao = null)
 {
     private const decimal QuantidadeMaxima = 999;
 
@@ -107,13 +108,59 @@ public class PedidoService(
         await ContaMesa.AtualizarValorAsync(db, mesa, perfil);
         await transacao.CommitAsync();
 
-        var (impressos, falhas) = await ImprimirProducaoAsync(
+        var (impressos, falhas, pendentes) = await ImprimirProducaoAsync(
             mesa.Numero, comanda.Descricao, garcom.Nome, pedido, perfil, reimpressao: false);
         pedido.ImpressoNosSetores = falhas.Count == 0;
         await db.SaveChangesAsync();
 
         await notificador.NotificarAsync(mesa.Id);
+        if (pendentes.Count > 0)
+        {
+            _ = TentarNovamenteAsync(pedido.Id, mesa.Id, pendentes);
+        }
         return new ResultadoPedido(pedido.Id, impressos, falhas);
+    }
+
+    private static readonly TimeSpan[] EsperasNovaTentativa =
+        [TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(45), TimeSpan.FromMinutes(2)];
+
+    /// <summary>
+    /// Reenvia em segundo plano somente os tickets dos setores que falharam, para não duplicar
+    /// o preparo nos setores que já imprimiram. Se todos saírem, o pedido deixa de aparecer como "não impresso".
+    /// </summary>
+    private async Task TentarNovamenteAsync(int pedidoId, int mesaId, List<TicketPendente> pendentes)
+    {
+        try
+        {
+            foreach (var espera in EsperasNovaTentativa)
+            {
+                await Task.Delay(espera);
+                await using (var consulta = await dbFactory.CreateDbContextAsync())
+                {
+                    // O caixa pode ter reimpresso manualmente durante a espera.
+                    if (await consulta.Pedidos.AnyAsync(p => p.Id == pedidoId && p.ImpressoNosSetores)) return;
+                }
+
+                var resultados = new List<TicketPendente>();
+                foreach (var ticket in pendentes)
+                {
+                    if (!await impressao.ImprimirAsync(ticket.Setor, ticket.Titulo, ticket.Documento))
+                        resultados.Add(ticket);
+                }
+                pendentes = resultados;
+                if (pendentes.Count > 0) continue;
+
+                await using var db = await dbFactory.CreateDbContextAsync();
+                await db.Pedidos.Where(p => p.Id == pedidoId)
+                    .ExecuteUpdateAsync(p => p.SetProperty(x => x.ImpressoNosSetores, true));
+                await notificador.NotificarAsync(mesaId);
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            // Sem nova tentativa: o pedido continua "não impresso" e pode ser reimpresso pelo caixa.
+        }
     }
 
     public async Task<ResultadoPedido> ReimprimirPedidoAsync(int pedidoId)
@@ -129,7 +176,7 @@ public class PedidoService(
             .FirstOrDefaultAsync(p => p.Id == pedidoId)
             ?? throw new RegraNegocioException("Pedido não encontrado.");
 
-        var (impressos, falhas) = await ImprimirProducaoAsync(pedido.Mesa.Numero, pedido.Comanda.Descricao,
+        var (impressos, falhas, _) = await ImprimirProducaoAsync(pedido.Mesa.Numero, pedido.Comanda.Descricao,
             pedido.UsuarioGarcom.Nome, pedido, perfil, reimpressao: true);
         if (falhas.Count == 0 && !pedido.ImpressoNosSetores)
         {
@@ -152,7 +199,7 @@ public class PedidoService(
         await using var db = await dbFactory.CreateDbContextAsync();
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         await using var transacao = await db.Database.BeginTransactionAsync();
-        var gerente = await UsuarioService.ValidarGerenteAsync(db, pinGerente);
+        var gerente = await UsuarioService.ValidarGerenteAsync(db, pinGerente, protecao);
 
         var item = await db.ItensPedido.Include(i => i.Produto).Include(i => i.SetorImpressao)
             .FirstOrDefaultAsync(i => i.Id == itemId)
@@ -367,7 +414,9 @@ public class PedidoService(
             setorDestino, destacarObservacoes || setorDestino?.ObservacoesEmDestaque == true, sugerePessoas);
     }
 
-    private async Task<(List<SetorImpressao> Impressos, List<SetorImpressao> Falhas)> ImprimirProducaoAsync(
+    private sealed record TicketPendente(SetorImpressao Setor, string Titulo, DocumentoEscPos Documento);
+
+    private async Task<(List<SetorImpressao> Impressos, List<SetorImpressao> Falhas, List<TicketPendente> Pendentes)> ImprimirProducaoAsync(
         int numeroMesa,
         string comanda,
         string garcom,
@@ -377,6 +426,7 @@ public class PedidoService(
     {
         var impressos = new List<SetorImpressao>();
         var falhas = new List<SetorImpressao>();
+        var pendentes = new List<TicketPendente>();
 
         var porSetor = pedido.Itens
             .Where(i => !i.Cancelado && i.SetorImpressao is not null)
@@ -391,10 +441,12 @@ public class PedidoService(
                     i.Quantidade, i.Produto.Nome, i.ObservacoesModificadores, i.DestacarObservacoes)),
                 reimpressao);
 
-            var sucesso = await impressao.ImprimirAsync(grupo.Key, $"Pedido #{pedido.Id} mesa {numeroMesa}", documento);
+            var titulo = $"Pedido #{pedido.Id} mesa {numeroMesa}";
+            var sucesso = await impressao.ImprimirAsync(grupo.Key, titulo, documento);
             (sucesso ? impressos : falhas).Add(grupo.Key);
+            if (!sucesso) pendentes.Add(new TicketPendente(grupo.Key, titulo, documento));
         }
 
-        return (impressos, falhas);
+        return (impressos, falhas, pendentes);
     }
 }

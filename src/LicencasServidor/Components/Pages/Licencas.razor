@@ -24,7 +24,7 @@ else
             <tbody>
                 @foreach (var l in _licencas)
                 {
-                    var (texto, cor) = Situacao(l);
+                    var (texto, cor) = SituacaoPainel.De(l);
                     <tr role="button" @onclick='() => Navegacao.NavigateTo($"licenca/{l.Id}")'>
                         <td>@l.Cliente</td>
                         <td class="font-monospace">@l.Id</td>
@@ -53,15 +53,4 @@ else
 
     private async Task CarregarAsync() => _licencas = await Servico.ListarAsync(_busca);
 
-    public static (string Texto, string Cor) Situacao(LicencaCliente l)
-    {
-        if (l.Bloqueada) return ("Bloqueada", "danger");
-        var dias = l.ValidaAte.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
-        return dias switch
-        {
-            < 0 => ("Vencida", "danger"),
-            <= 7 => ($"Vence em {dias} dia(s)", "warning"),
-            _ => ("Ativa", "success")
-        };
-    }
 }

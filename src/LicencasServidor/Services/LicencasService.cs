@@ -189,3 +189,19 @@ public class LimiteTentativas(TimeProvider relogio)
 
     public void RegistrarSucesso(string origem) => _origens.TryRemove(origem, out _);
 }
+
+public static class SituacaoPainel
+{
+    /// <summary>Texto e cor (Bootstrap) da situação de uma licença no painel.</summary>
+    public static (string Texto, string Cor) De(LicencaCliente l)
+    {
+        if (l.Bloqueada) return ("Bloqueada", "danger");
+        var dias = l.ValidaAte.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
+        return dias switch
+        {
+            < 0 => ("Vencida", "danger"),
+            <= 7 => ($"Vence em {dias} dia(s)", "warning"),
+            _ => ("Ativa", "success")
+        };
+    }
+}

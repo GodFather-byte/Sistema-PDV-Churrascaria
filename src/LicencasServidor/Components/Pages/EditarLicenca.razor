@@ -87,7 +87,7 @@
     private void Estender(int meses)
     {
         var hoje = DateOnly.FromDateTime(DateTime.Today);
-        _dados.ValidaAte = (_dados.ValidaAte < hoje ? hoje : _dados.ValidaAte).AddMonths(meses);
+        _dados.ValidaAte = (hoje > _dados.ValidaAte ? hoje : _dados.ValidaAte).AddMonths(meses);
     }
 
     private async Task SalvarAsync()

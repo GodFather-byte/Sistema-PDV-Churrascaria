@@ -23,7 +23,7 @@
     </dl>
     @if (_registro is { } r)
     {
-        var (texto, cor) = Licencas.Situacao(r);
+        var (texto, cor) = SituacaoPainel.De(r);
         <p>No painel: <span class="badge bg-@cor">@texto</span>, válida até @r.ValidaAte.ToString("dd/MM/yyyy").
             <a href="licenca/@r.Id">Abrir cadastro</a></p>
     }

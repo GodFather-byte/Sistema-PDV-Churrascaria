@@ -4,7 +4,7 @@ using ChurrascariaPDV.Domain.Enums;
 
 namespace ChurrascariaPDV.Services.Impressao;
 
-public record LinhaTicketProducao(decimal Quantidade, string Produto, string? Observacoes);
+public record LinhaTicketProducao(decimal Quantidade, string Produto, string? Observacoes, bool DestacarObservacoes = false);
 
 public record LinhaTicketConta(decimal Quantidade, string Produto, decimal ValorUnitario, decimal ValorTotal, string? Observacoes);
 
@@ -50,7 +50,7 @@ public static class TicketsImpressao
             doc.Texto($"{Quantidade(item.Quantidade)} x {item.Produto}", negrito: true, grande: setor.ItensEmDestaque);
             if (!string.IsNullOrWhiteSpace(item.Observacoes))
             {
-                var destaque = setor.ObservacoesEmDestaque;
+                var destaque = item.DestacarObservacoes;
                 doc.Texto($"  >> {(destaque ? item.Observacoes.ToUpper(PtBr) : item.Observacoes)}", negrito: true, grande: destaque);
             }
         }

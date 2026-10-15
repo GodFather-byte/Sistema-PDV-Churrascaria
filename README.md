@@ -86,7 +86,8 @@ Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em prod
 
 ## Regras de negócio
 
-- **Abertura automática** da mesa no primeiro item; a quantidade de rodízios sugere o número de pessoas.
+- **Abertura automática** da mesa no primeiro item; grupos com **Sugerir pessoas** usam a quantidade para sugerir o número de pessoas.
+  O perfil inicial associa essa regra aos rodízios existentes.
 - **Conta geral ou comandas individuais** na mesma mesa; comanda individual quitada é encerrada sem liberar a mesa.
 - **Transferência de mesa**: leva todas as comandas; se o destino estiver ocupado as contas são juntadas.
   A origem fica aguardando limpeza.
@@ -123,6 +124,27 @@ Somente o modo de simulação e o timeout continuam em `src/ChurrascariaPDV/apps
 Com `ModoSimulacao: true` nada é enviado à rede: os tickets aparecem no console e na tela **Impressões** (`/impressoes`).
 Com `false`, os tickets são enviados em ESC/POS (code page PC860, corte parcial) por `TcpClient`. Se uma impressora falhar,
 o pedido continua salvo, o item aparece como “não impresso” no caixa e pode ser reimpresso.
+
+## Modificadores e tipos de estabelecimento
+
+Em **Cardápio** (`/admin/produtos`), cada grupo permite configurar:
+
+- escolha obrigatória ou opcional e seleção única ou múltipla;
+- setor de produção que substitui o setor do produto quando o grupo é aplicado;
+- destaque das observações na produção;
+- uso da quantidade do item para sugerir pessoas da mesa.
+
+Grupos com opções aplicam suas regras quando uma opção é selecionada. Grupos sem opções aplicam
+a regra sempre, sem abrir uma janela de escolha; não podem ser obrigatórios.
+Se as escolhas direcionarem o mesmo item para setores diferentes, o pedido é rejeitado com uma mensagem.
+Os grupos continuam vinculados explicitamente aos produtos: um bar sem rodízio ou uma pizzaria sem ponto
+de carne não precisam cadastrar nem usar esses grupos. O tipo **Produto** é a classificação padrão;
+os tipos antigos continuam disponíveis, mas não impõem regras nem setores.
+
+A churrascaria mantém seus grupos de ponto da carne e preferência de bebida. A atualização cria um
+grupo de consumo por pessoa para os rodízios existentes, sem sobrescrever grupos personalizados.
+Setor e destaque são registrados no item ao lançar o pedido e preservados nas transferências e nos
+cancelamentos parciais. Alterações futuras no produto ou grupo não redirecionam reimpressões antigas.
 
 ## Tempo real
 

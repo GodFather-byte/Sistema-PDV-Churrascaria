@@ -6,5 +6,6 @@ public enum TipoItem
     CarneAlaCarte,
     PorcaoCozinha,
     Bebida,
-    Sobremesa
+    Sobremesa,
+    Produto
 }

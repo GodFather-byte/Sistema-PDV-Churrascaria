@@ -6,6 +6,8 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using System.Net;
+using System.Net.Sockets;
 using static ChurrascariaPDV.Tests.AmbienteTeste;
 
 namespace ChurrascariaPDV.Tests;
@@ -39,6 +41,43 @@ public class SetorImpressaoTests
         await using var comando = conexao.CreateCommand();
         comando.CommandText = "PRAGMA foreign_key_check";
         Assert.Null(await comando.ExecuteScalarAsync());
+    }
+
+    [Fact]
+    public async Task MigrationDeRegrasPreservaGruposPersonalizadosEItensAnteriores()
+    {
+        await using var conexao = new SqliteConnection("Data Source=:memory:");
+        await conexao.OpenAsync();
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(conexao).Options);
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261015153358_VincularSetoresProdutos");
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO GruposModificadores (Id, Nome, Obrigatorio, SelecaoUnica) VALUES (3, 'Consumo por pessoa', 1, 1);
+            INSERT INTO Produtos (Id, Nome, Preco, CategoriaId, TipoItem, SetorImpressao, Ativo, ControlaEstoque, QuantidadeEstoque)
+            VALUES (101, 'Rodizio personalizado', '30', 1, 'Rodizio', NULL, 1, 0, '0');
+            INSERT INTO Comandas (Id, CodigoNumero, MesaId, Status, CobrarTaxaServico, DataHoraAbertura)
+            VALUES (1, 0, 1, 'Aberta', 1, '2026-10-15 12:00:00');
+            INSERT INTO Pedidos (Id, MesaId, ComandaId, UsuarioGarcomId, DataHoraLancamento, Status, ImpressoNosSetores)
+            VALUES (1, 1, 1, 3, '2026-10-15 12:00:00', 'Aberto', 1);
+            INSERT INTO ItensPedido (Id, PedidoId, ProdutoId, Quantidade, PrecoUnitarioHistorico, Cancelado, AutorizadoPorGerente, ObservacoesModificadores)
+            VALUES (1, 1, 3, '1', '119.90', 0, 0, 'Ao Ponto');
+            """);
+
+        await migrator.MigrateAsync();
+
+        var personalizado = await db.GruposModificadores.SingleAsync(g => g.Id == 3);
+        Assert.Equal("Consumo por pessoa", personalizado.Nome);
+        Assert.True(personalizado.Obrigatorio);
+        Assert.True(personalizado.SelecaoUnica);
+        var regra = await db.GruposModificadores.SingleAsync(g => g.SugerePessoas);
+        Assert.NotEqual(3, regra.Id);
+        Assert.NotEqual(personalizado.Nome, regra.Nome);
+        Assert.True(await db.GruposModificadoresProdutos.AnyAsync(v => v.ProdutoId == 101 && v.GrupoModificadorId == regra.Id));
+        var item = await db.ItensPedido.SingleAsync();
+        Assert.Equal(SetorImpressao.Churrasqueira, item.SetorImpressaoId);
+        Assert.True(item.DestacarObservacoes);
+        Assert.Equal("Ao Ponto", item.ObservacoesModificadores);
+        Assert.Equal(119.90m, item.PrecoUnitarioHistorico);
     }
 
     [Fact]
@@ -105,5 +144,47 @@ public class SetorImpressaoTests
         Assert.False(registro.Simulado);
         Assert.False(registro.Sucesso);
         Assert.Contains("não configurado", registro.Erro);
+    }
+
+    [Fact]
+    public async Task ImpressaoRealEntregaBytesNoIpEPortaDoCadastro()
+    {
+        await using var ambiente = await CriarAsync(o =>
+        {
+            o.ModoSimulacao = false;
+            o.TimeoutMs = 10000;
+        });
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var setor = new SetorImpressao
+        {
+            Nome = "Teste local", Ip = "127.0.0.1", Porta = ((IPEndPoint)listener.LocalEndpoint).Port
+        };
+        var recebimento = listener.AcceptTcpClientAsync(timeout.Token);
+        var documento = new DocumentoEscPos(48).Texto("Teste");
+
+        var sucesso = await ambiente.Servico<ImpressaoService>().ImprimirAsync(setor, "Teste", documento, timeout.Token);
+        Assert.True(sucesso, Assert.Single(ambiente.Impressoes.Listar()).Erro);
+        using var cliente = await recebimento;
+        await using var dados = new MemoryStream();
+        await cliente.GetStream().CopyToAsync(dados, timeout.Token);
+
+        Assert.Equal(documento.ParaBytes(), dados.ToArray());
+        Assert.False(Assert.Single(ambiente.Impressoes.Listar()).Simulado);
+    }
+
+    [Fact]
+    public async Task SetorDesabilitadoNaoTentaConectar()
+    {
+        await using var ambiente = await CriarAsync(o => o.ModoSimulacao = false);
+        var setor = new SetorImpressao { Nome = "Desabilitado", Ip = "", Habilitada = false };
+
+        Assert.True(await ambiente.Servico<ImpressaoService>()
+            .ImprimirAsync(setor, "Teste", new DocumentoEscPos(48).Texto("Teste")));
+
+        var registro = Assert.Single(ambiente.Impressoes.Listar());
+        Assert.True(registro.Simulado);
+        Assert.True(registro.Sucesso);
     }
 }

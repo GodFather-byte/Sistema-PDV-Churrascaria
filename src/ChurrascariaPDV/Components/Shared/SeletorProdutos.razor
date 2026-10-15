@@ -37,7 +37,7 @@
     <ChildContent>
         @if (_produtoModificador is { } produto)
         {
-            @foreach (var grupo in produto.Grupos)
+            @foreach (var grupo in produto.Grupos.Where(g => g.Opcoes.Count > 0))
             {
                 <div class="grupo-modificador">
                     <div class="grupo-modificador-titulo">

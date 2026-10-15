@@ -98,9 +98,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<GrupoModificador>()
-            .HasIndex(grupo => grupo.Nome)
-            .IsUnique();
+        modelBuilder.Entity<GrupoModificador>(entity =>
+        {
+            entity.HasIndex(grupo => grupo.Nome).IsUnique();
+            entity.HasOne(grupo => grupo.SetorImpressao).WithMany()
+                .HasForeignKey(grupo => grupo.SetorImpressaoId).OnDelete(DeleteBehavior.Restrict);
+        });
 
         modelBuilder.Entity<OpcaoModificador>(entity =>
         {
@@ -142,6 +145,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<ItemPedido>(entity =>
         {
+            entity.HasOne(item => item.SetorImpressao).WithMany()
+                .HasForeignKey(item => item.SetorImpressaoId).OnDelete(DeleteBehavior.Restrict);
             entity.Property(item => item.Quantidade).HasPrecision(10, 3);
             entity.Property(item => item.PrecoUnitarioHistorico).HasPrecision(10, 2);
             entity.Property(item => item.ObservacoesModificadores).HasMaxLength(500);

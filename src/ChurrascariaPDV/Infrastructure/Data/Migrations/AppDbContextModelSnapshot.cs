@@ -146,6 +146,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("DestacarObservacoes")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -156,10 +159,18 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<bool>("SelecaoUnica")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("SetorImpressaoId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("SugerePessoas")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Nome")
                         .IsUnique();
+
+                    b.HasIndex("SetorImpressaoId");
 
                     b.ToTable("GruposModificadores");
 
@@ -167,16 +178,20 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         new
                         {
                             Id = 1,
+                            DestacarObservacoes = false,
                             Nome = "Ponto da Carne",
                             Obrigatorio = true,
-                            SelecaoUnica = true
+                            SelecaoUnica = true,
+                            SugerePessoas = false
                         },
                         new
                         {
                             Id = 2,
+                            DestacarObservacoes = false,
                             Nome = "Preferência Bebida",
                             Obrigatorio = false,
-                            SelecaoUnica = false
+                            SelecaoUnica = false,
+                            SugerePessoas = false
                         });
                 });
 
@@ -237,6 +252,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("DataHoraCancelamento")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("DestacarObservacoes")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("MotivoCancelamento")
                         .HasMaxLength(250)
                         .HasColumnType("TEXT");
@@ -259,6 +277,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .HasPrecision(10, 3)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SetorImpressaoId")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("UsuarioGerenteAutorizacaoId")
                         .HasColumnType("INTEGER");
 
@@ -267,6 +288,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.HasIndex("PedidoId");
 
                     b.HasIndex("ProdutoId");
+
+                    b.HasIndex("SetorImpressaoId");
 
                     b.HasIndex("UsuarioGerenteAutorizacaoId");
 
@@ -1452,6 +1475,16 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("Mesa");
                 });
 
+            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.GrupoModificador", b =>
+                {
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.SetorImpressao", "SetorImpressao")
+                        .WithMany()
+                        .HasForeignKey("SetorImpressaoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("SetorImpressao");
+                });
+
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.GrupoModificadorProduto", b =>
                 {
                     b.HasOne("ChurrascariaPDV.Domain.Entities.GrupoModificador", "GrupoModificador")
@@ -1485,6 +1518,11 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.SetorImpressao", "SetorImpressao")
+                        .WithMany()
+                        .HasForeignKey("SetorImpressaoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ChurrascariaPDV.Domain.Entities.Usuario", "UsuarioGerenteAutorizacao")
                         .WithMany()
                         .HasForeignKey("UsuarioGerenteAutorizacaoId")
@@ -1493,6 +1531,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("Pedido");
 
                     b.Navigation("Produto");
+
+                    b.Navigation("SetorImpressao");
 
                     b.Navigation("UsuarioGerenteAutorizacao");
                 });

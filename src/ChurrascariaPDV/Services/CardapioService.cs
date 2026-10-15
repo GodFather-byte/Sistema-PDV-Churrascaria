@@ -19,7 +19,7 @@ public record ProdutoCardapio(
     SetorImpressao? SetorImpressao,
     IReadOnlyList<GrupoCardapio> Grupos)
 {
-    public bool TemModificadores => Grupos.Count > 0;
+    public bool TemModificadores => Grupos.Any(grupo => grupo.Opcoes.Count > 0);
 }
 
 public record CategoriaCardapio(int Id, string Nome, IReadOnlyList<ProdutoCardapio> Produtos);
@@ -80,7 +80,8 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
     public async Task<List<GrupoModificador>> ListarGruposAsync()
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        return await db.GruposModificadores.AsNoTracking().Include(g => g.Opcoes).OrderBy(g => g.Nome).ToListAsync();
+        return await db.GruposModificadores.AsNoTracking().Include(g => g.Opcoes)
+            .Include(g => g.SetorImpressao).OrderBy(g => g.Nome).ToListAsync();
     }
 
     public async Task SalvarCategoriaAsync(int id, string nome)
@@ -120,6 +121,11 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             throw new RegraNegocioException("O preço não pode ser negativo.");
         }
 
+        if (!Enum.IsDefined(dados.TipoItem))
+        {
+            throw new RegraNegocioException("Selecione um tipo de item válido.");
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync();
         if (!await db.CategoriasProdutos.AnyAsync(c => c.Id == dados.CategoriaId))
         {
@@ -132,6 +138,12 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             throw new RegraNegocioException("Selecione um setor de impressão válido.");
         }
 
+        var gruposIds = gruposModificadores.Distinct().ToList();
+        if (await db.GruposModificadores.CountAsync(g => gruposIds.Contains(g.Id)) != gruposIds.Count)
+        {
+            throw new RegraNegocioException("Selecione grupos de opções válidos.");
+        }
+
         var produto = dados.Id == 0
             ? new Produto()
             : await db.Produtos.Include(p => p.GruposModificadores).FirstOrDefaultAsync(p => p.Id == dados.Id)
@@ -141,12 +153,12 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         produto.Preco = CalculoConta.Arredondar(dados.Preco);
         produto.CategoriaId = dados.CategoriaId;
         produto.TipoItem = dados.TipoItem;
-        produto.SetorImpressaoId = dados.TipoItem == TipoItem.Rodizio ? null : setorId;
+        produto.SetorImpressaoId = setorId;
         produto.Ativo = dados.Ativo;
         produto.ControlaEstoque = dados.ControlaEstoque;
 
         produto.GruposModificadores.Clear();
-        foreach (var grupoId in gruposModificadores.Distinct())
+        foreach (var grupoId in gruposIds)
         {
             produto.GruposModificadores.Add(new GrupoModificadorProduto { GrupoModificadorId = grupoId });
         }
@@ -159,7 +171,9 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         await db.SaveChangesAsync();
     }
 
-    public async Task SalvarGrupoAsync(int id, string nome, bool obrigatorio, bool selecaoUnica, IReadOnlyList<string> opcoes)
+    public async Task SalvarGrupoAsync(
+        int id, string nome, bool obrigatorio, bool selecaoUnica, IReadOnlyList<string> opcoes,
+        string? setorImpressaoId = null, bool destacarObservacoes = false, bool sugerePessoas = false)
     {
         var nomesOpcoes = opcoes.Select(o => o.Trim()).Where(o => o.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (string.IsNullOrWhiteSpace(nome))
@@ -167,12 +181,18 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             throw new RegraNegocioException("Informe o nome do grupo.");
         }
 
-        if (nomesOpcoes.Count == 0)
+        if (nomesOpcoes.Count == 0 && (obrigatorio || (!sugerePessoas && !destacarObservacoes && string.IsNullOrWhiteSpace(setorImpressaoId))))
         {
             throw new RegraNegocioException("Informe ao menos uma opção.");
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
+        setorImpressaoId = string.IsNullOrWhiteSpace(setorImpressaoId) ? null : setorImpressaoId;
+        if (setorImpressaoId is not null && !await db.SetoresImpressao.AnyAsync(s => s.Id == setorImpressaoId))
+        {
+            throw new RegraNegocioException("Selecione um setor de impressão válido para o grupo.");
+        }
+
         nome = nome.Trim();
         if (await db.GruposModificadores.AnyAsync(g => g.Nome == nome && g.Id != id))
         {
@@ -186,6 +206,9 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         grupo.Nome = nome;
         grupo.Obrigatorio = obrigatorio;
         grupo.SelecaoUnica = selecaoUnica;
+        grupo.SetorImpressaoId = setorImpressaoId;
+        grupo.DestacarObservacoes = destacarObservacoes;
+        grupo.SugerePessoas = sugerePessoas;
 
         foreach (var removida in grupo.Opcoes.Where(o => !nomesOpcoes.Contains(o.Nome, StringComparer.OrdinalIgnoreCase)).ToList())
         {

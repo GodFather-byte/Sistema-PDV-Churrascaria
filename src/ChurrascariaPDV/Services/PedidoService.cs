@@ -51,15 +51,23 @@ public class PedidoService(
         var produtos = await db.Produtos
             .Include(p => p.SetorImpressao)
             .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.Opcoes)
+            .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.SetorImpressao)
             .Where(p => produtoIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id);
 
         var pedido = new Pedido { MesaId = mesa.Id, UsuarioGarcomId = garcom.Id, DataHoraLancamento = DateTime.Now };
+        var pessoasSugeridas = 0m;
         foreach (var item in novo.Itens)
         {
             if (!produtos.TryGetValue(item.ProdutoId, out var produto) || !produto.Ativo)
             {
                 throw new RegraNegocioException("Um dos produtos do pedido não está mais disponível.");
+            }
+
+            var regras = AplicarModificadores(produto, item);
+            if (regras.SugerePessoas)
+            {
+                pessoasSugeridas += item.Quantidade;
             }
 
             pedido.Itens.Add(new ItemPedido
@@ -68,12 +76,14 @@ public class PedidoService(
                 Produto = produto,
                 Quantidade = item.Quantidade,
                 PrecoUnitarioHistorico = produto.Preco,
-                ObservacoesModificadores = MontarObservacoes(produto, item)
+                ObservacoesModificadores = regras.Observacoes,
+                SetorImpressao = regras.Setor,
+                SetorImpressaoId = regras.Setor?.Id,
+                DestacarObservacoes = regras.DestacarObservacoes
             });
         }
 
-        var pessoasRodizio = (int)pedido.Itens.Where(i => i.Produto.TipoItem == TipoItem.Rodizio).Sum(i => i.Quantidade);
-        ContaMesa.Ocupar(mesa, pessoasRodizio);
+        ContaMesa.Ocupar(mesa, (int)pessoasSugeridas);
         if (mesa.Status == StatusMesa.ContaSolicitada)
         {
             // Consumo novo depois da pré-conta: a conferência impressa deixou de valer.
@@ -111,7 +121,7 @@ public class PedidoService(
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var pedido = await db.Pedidos
             .Include(p => p.Itens).ThenInclude(i => i.Produto)
-                .ThenInclude(p => p.SetorImpressao)
+            .Include(p => p.Itens).ThenInclude(i => i.SetorImpressao)
             .Include(p => p.Mesa)
             .Include(p => p.Comanda)
             .Include(p => p.UsuarioGarcom)
@@ -143,7 +153,7 @@ public class PedidoService(
         await using var transacao = await db.Database.BeginTransactionAsync();
         var gerente = await UsuarioService.ValidarGerenteAsync(db, pinGerente);
 
-        var item = await db.ItensPedido.Include(i => i.Produto).ThenInclude(p => p.SetorImpressao)
+        var item = await db.ItensPedido.Include(i => i.Produto).Include(i => i.SetorImpressao)
             .FirstOrDefaultAsync(i => i.Id == itemId)
                    ?? throw new RegraNegocioException("Item não encontrado.");
         if (item.Cancelado)
@@ -174,7 +184,9 @@ public class PedidoService(
                 Produto = item.Produto,
                 Quantidade = quantidade,
                 PrecoUnitarioHistorico = item.PrecoUnitarioHistorico,
-                ObservacoesModificadores = item.ObservacoesModificadores
+                ObservacoesModificadores = item.ObservacoesModificadores,
+                SetorImpressaoId = item.SetorImpressaoId,
+                DestacarObservacoes = item.DestacarObservacoes
             };
             pedido.Itens.Add(cancelado);
         }
@@ -195,7 +207,7 @@ public class PedidoService(
         await ContaMesa.AtualizarValorAsync(db, pedido.Mesa, perfil);
         await transacao.CommitAsync();
 
-        if (item.Produto.SetorImpressao is { } setor && pedido.ImpressoNosSetores)
+        if (item.SetorImpressao is { } setor && pedido.ImpressoNosSetores)
         {
             var documento = TicketsImpressao.Cancelamento(impressao.NovoDocumento(perfil), setor,
                 pedido.Mesa.Numero, comanda.Descricao, gerente.Nome, cancelado.MotivoCancelamento,
@@ -268,7 +280,9 @@ public class PedidoService(
                 ProdutoId = item.ProdutoId,
                 Quantidade = quantidade,
                 PrecoUnitarioHistorico = item.PrecoUnitarioHistorico,
-                ObservacoesModificadores = item.ObservacoesModificadores
+                ObservacoesModificadores = item.ObservacoesModificadores,
+                SetorImpressaoId = item.SetorImpressaoId,
+                DestacarObservacoes = item.DestacarObservacoes
             });
         }
         else
@@ -295,10 +309,15 @@ public class PedidoService(
         await notificador.NotificarAsync(pedidoOrigem.MesaId, mesaDestino.Id);
     }
 
-    private static string? MontarObservacoes(Produto produto, ItemNovoPedido item)
+    private record RegrasItem(string? Observacoes, SetorImpressao? Setor, bool DestacarObservacoes, bool SugerePessoas);
+
+    private static RegrasItem AplicarModificadores(Produto produto, ItemNovoPedido item)
     {
         var opcoesSelecionadas = item.OpcoesIds.Distinct().ToHashSet();
         var partes = new List<string>();
+        var setores = new Dictionary<string, SetorImpressao>();
+        var destacarObservacoes = false;
+        var sugerePessoas = false;
 
         foreach (var grupo in produto.GruposModificadores.Select(g => g.GrupoModificador).OrderByDescending(g => g.Obrigatorio).ThenBy(g => g.Nome))
         {
@@ -314,11 +333,25 @@ public class PedidoService(
             }
 
             partes.AddRange(escolhidas.Select(o => o.Nome));
+            if (escolhidas.Count > 0 || grupo.Opcoes.Count == 0)
+            {
+                destacarObservacoes |= grupo.DestacarObservacoes;
+                sugerePessoas |= grupo.SugerePessoas;
+                if (grupo.SetorImpressao is { } setor)
+                {
+                    setores.TryAdd(setor.Id, setor);
+                }
+            }
         }
 
         if (opcoesSelecionadas.Count > 0)
         {
             throw new RegraNegocioException($"Há opções inválidas selecionadas para {produto.Nome}.");
+        }
+
+        if (setores.Count > 1)
+        {
+            throw new RegraNegocioException($"As opções de {produto.Nome} direcionam o item para setores diferentes. Revise os grupos.");
         }
 
         if (!string.IsNullOrWhiteSpace(item.Observacao))
@@ -327,7 +360,10 @@ public class PedidoService(
         }
 
         var texto = string.Join(", ", partes);
-        return texto.Length == 0 ? null : texto[..Math.Min(500, texto.Length)];
+        var setorDestino = setores.Values.SingleOrDefault() ?? produto.SetorImpressao;
+        return new RegrasItem(
+            texto.Length == 0 ? null : texto[..Math.Min(500, texto.Length)],
+            setorDestino, destacarObservacoes || setorDestino?.ObservacoesEmDestaque == true, sugerePessoas);
     }
 
     private async Task<(List<SetorImpressao> Impressos, List<SetorImpressao> Falhas)> ImprimirProducaoAsync(
@@ -342,15 +378,16 @@ public class PedidoService(
         var falhas = new List<SetorImpressao>();
 
         var porSetor = pedido.Itens
-            .Where(i => !i.Cancelado && i.Produto.SetorImpressao is not null)
-            .GroupBy(i => i.Produto.SetorImpressao!)
+            .Where(i => !i.Cancelado && i.SetorImpressao is not null)
+            .GroupBy(i => i.SetorImpressao!)
             .OrderBy(g => g.Key.Ordem).ThenBy(g => g.Key.Nome);
 
         foreach (var grupo in porSetor)
         {
             var documento = TicketsImpressao.Producao(impressao.NovoDocumento(perfil), grupo.Key, numeroMesa, comanda, garcom,
                 pedido.DataHoraLancamento, pedido.Id,
-                grupo.Select(i => new LinhaTicketProducao(i.Quantidade, i.Produto.Nome, i.ObservacoesModificadores)),
+                grupo.Select(i => new LinhaTicketProducao(
+                    i.Quantidade, i.Produto.Nome, i.ObservacoesModificadores, i.DestacarObservacoes)),
                 reimpressao);
 
             var sucesso = await impressao.ImprimirAsync(grupo.Key, $"Pedido #{pedido.Id} mesa {numeroMesa}", documento);

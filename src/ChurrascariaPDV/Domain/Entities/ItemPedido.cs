@@ -8,6 +8,9 @@ public class ItemPedido
     public decimal Quantidade { get; set; }
     public decimal PrecoUnitarioHistorico { get; set; }
     public string? ObservacoesModificadores { get; set; }
+    public string? SetorImpressaoId { get; set; }
+    public SetorImpressao? SetorImpressao { get; set; }
+    public bool DestacarObservacoes { get; set; }
     public bool Cancelado { get; set; }
     public string? MotivoCancelamento { get; set; }
     public bool AutorizadoPorGerente { get; set; }

@@ -420,7 +420,7 @@ public class MesaService(
         CalculoConta.Calcular(comanda, perfil),
         comanda.Pedidos
             .SelectMany(p => p.Itens.Select(i => new ItemConsumo(
-                i.Id, p.Id, comanda.Id, i.ProdutoId, i.Produto.Nome, i.Produto.SetorImpressao, i.Quantidade,
+                i.Id, p.Id, comanda.Id, i.ProdutoId, i.Produto.Nome, i.SetorImpressao, i.Quantidade,
                 i.PrecoUnitarioHistorico, CalculoConta.Arredondar(i.Quantidade * i.PrecoUnitarioHistorico),
                 i.ObservacoesModificadores, p.UsuarioGarcom.Nome, p.DataHoraLancamento, i.Cancelado,
                 i.MotivoCancelamento, p.ImpressoNosSetores)))

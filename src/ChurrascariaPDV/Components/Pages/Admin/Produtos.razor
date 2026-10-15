@@ -58,6 +58,9 @@
                         <span>
                             <strong>@grupo.Nome</strong>
                             @(grupo.Obrigatorio ? " · obrigatório" : string.Empty)@(grupo.SelecaoUnica ? " · escolha única" : " · múltipla")
+                            @(grupo.SugerePessoas ? " · sugere pessoas" : string.Empty)
+                            @(grupo.DestacarObservacoes ? " · destaque" : string.Empty)
+                            @(grupo.SetorImpressao is { } destino ? $" · {destino.Nome}" : string.Empty)
                             <small class="d-block text-muted">@string.Join(", ", grupo.Opcoes.Select(o => o.Nome))</small>
                         </span>
                         <button type="button" class="btn btn-sm btn-link" @onclick="() => EditarGrupo(grupo)">editar</button>
@@ -100,7 +103,7 @@
                     </div>
                     <div class="col">
                         <label class="form-label">Imprimir em</label>
-                        <select class="form-select" @bind="_produto.SetorImpressaoId" disabled="@(_produto.TipoItem == TipoItem.Rodizio)">
+                        <select class="form-select" @bind="_produto.SetorImpressaoId">
                             <option value="">Sem impressão</option>
                             @foreach (var setor in _setores)
                             {
@@ -109,10 +112,7 @@
                         </select>
                     </div>
                 </div>
-                @if (_produto.TipoItem == TipoItem.Rodizio)
-                {
-                    <p class="text-muted small">Rodízio não imprime na produção: vai direto para a conta da mesa.</p>
-                }
+                <p class="text-muted small">O tipo é apenas uma classificação. O setor e os grupos definem as regras do produto.</p>
                 <label class="form-label">Grupos de opções</label>
                 <div class="d-flex flex-wrap gap-2 mb-2">
                     @foreach (var grupo in _grupos)
@@ -165,6 +165,17 @@
                     <input id="grupo-unica" class="form-check-input" type="checkbox" @bind="_grupoEditando.SelecaoUnica" />
                     <label class="form-check-label" for="grupo-unica">Apenas uma opção</label>
                 </div>
+                <label class="form-label">Setor ao aplicar este grupo</label>
+                <select class="form-select mb-2" @bind="_grupoEditando.SetorImpressaoId">
+                    <option value="">Manter setor do produto</option>
+                    @foreach (var setor in _setores)
+                    {
+                        <option value="@setor.Id">@setor.Nome</option>
+                    }
+                </select>
+                <label class="d-block mb-2"><input type="checkbox" @bind="_grupoEditando.DestacarObservacoes" /> Destacar observações na produção</label>
+                <label class="d-block mb-2"><input type="checkbox" @bind="_grupoEditando.SugerePessoas" /> Usar quantidade para sugerir pessoas da mesa</label>
+                <p class="text-muted small">Com opções, a regra se aplica quando houver uma escolha. Sem opções, a regra se aplica sempre; nesse caso o grupo não pode ser obrigatório.</p>
                 <label class="form-label">Opções (uma por linha)</label>
                 <textarea class="form-control" rows="5" @bind="_opcoesGrupo"></textarea>
             }
@@ -204,7 +215,7 @@
     private void EditarProduto(Produto? produto)
     {
         _produto = produto is null
-            ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, TipoItem = TipoItem.PorcaoCozinha, Ativo = true }
+            ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, Ativo = true }
             : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressaoId = produto.SetorImpressaoId, Ativo = produto.Ativo, ControlaEstoque = produto.ControlaEstoque, QuantidadeEstoque = produto.QuantidadeEstoque };
         _precoProduto = Formato.ValorEditavel(_produto.Preco);
         _gruposProduto = produto?.GruposModificadores.Select(g => g.GrupoModificadorId).ToHashSet() ?? [];
@@ -242,7 +253,11 @@
     {
         _grupoEditando = grupo is null
             ? new GrupoModificador()
-            : new GrupoModificador { Id = grupo.Id, Nome = grupo.Nome, Obrigatorio = grupo.Obrigatorio, SelecaoUnica = grupo.SelecaoUnica };
+            : new GrupoModificador
+            {
+                Id = grupo.Id, Nome = grupo.Nome, Obrigatorio = grupo.Obrigatorio, SelecaoUnica = grupo.SelecaoUnica,
+                SetorImpressaoId = grupo.SetorImpressaoId, DestacarObservacoes = grupo.DestacarObservacoes, SugerePessoas = grupo.SugerePessoas
+            };
         _opcoesGrupo = grupo is null ? string.Empty : string.Join(Environment.NewLine, grupo.Opcoes.Select(o => o.Nome));
     }
 
@@ -252,7 +267,9 @@
         await ExecutarAsync(async () =>
         {
             var opcoes = (_opcoesGrupo ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            await CardapioService.SalvarGrupoAsync(_grupoEditando.Id, _grupoEditando.Nome, _grupoEditando.Obrigatorio, _grupoEditando.SelecaoUnica, opcoes);
+            await CardapioService.SalvarGrupoAsync(
+                _grupoEditando.Id, _grupoEditando.Nome, _grupoEditando.Obrigatorio, _grupoEditando.SelecaoUnica, opcoes,
+                _grupoEditando.SetorImpressaoId, _grupoEditando.DestacarObservacoes, _grupoEditando.SugerePessoas);
             _grupoEditando = null;
         }, "Grupo salvo.");
     }

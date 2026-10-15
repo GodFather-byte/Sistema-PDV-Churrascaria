@@ -8,7 +8,7 @@ public class Produto
     public string Nome { get; set; } = string.Empty;
     public decimal Preco { get; set; }
     public int CategoriaId { get; set; }
-    public TipoItem TipoItem { get; set; }
+    public TipoItem TipoItem { get; set; } = TipoItem.Produto;
     public string? SetorImpressaoId { get; set; }
     public SetorImpressao? SetorImpressao { get; set; }
     public bool Ativo { get; set; } = true;

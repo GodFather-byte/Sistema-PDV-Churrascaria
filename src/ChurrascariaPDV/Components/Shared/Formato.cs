@@ -70,6 +70,7 @@ public static class Formato
         Domain.Enums.TipoItem.PorcaoCozinha => "Porção (cozinha)",
         Domain.Enums.TipoItem.Bebida => "Bebida",
         Domain.Enums.TipoItem.Sobremesa => "Sobremesa",
+        Domain.Enums.TipoItem.Produto => "Produto",
         _ => tipo.ToString()
     };
 

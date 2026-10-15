@@ -34,7 +34,7 @@ public class DocumentoEscPosTests
         var hora = new DateTime(2026, 10, 15, 12, 0, 0);
         var setor = new SetorImpressao { Nome = nome, ItensEmDestaque = itensGrandes, ObservacoesEmDestaque = destacar };
         var atual = TicketsImpressao.Producao(new DocumentoEscPos(48), setor, 1, "Conta Geral", "João", hora, 1,
-            [new LinhaTicketProducao(1, "Produto", "Ao Ponto")]).ParaBytes();
+            [new LinhaTicketProducao(1, "Produto", "Ao Ponto", destacar)]).ParaBytes();
         var anterior = new DocumentoEscPos(48)
             .Centro(nome.ToUpperInvariant(), negrito: true, grande: true)
             .Separador('=')

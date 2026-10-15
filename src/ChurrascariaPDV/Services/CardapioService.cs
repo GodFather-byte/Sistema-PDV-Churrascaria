@@ -1,0 +1,198 @@
+using ChurrascariaPDV.Domain.Entities;
+using ChurrascariaPDV.Domain.Enums;
+using ChurrascariaPDV.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace ChurrascariaPDV.Services;
+
+public record OpcaoCardapio(int Id, string Nome);
+
+public record GrupoCardapio(int Id, string Nome, bool Obrigatorio, bool SelecaoUnica, IReadOnlyList<OpcaoCardapio> Opcoes);
+
+public record ProdutoCardapio(
+    int Id,
+    string Nome,
+    decimal Preco,
+    int CategoriaId,
+    string Categoria,
+    TipoItem TipoItem,
+    SetorImpressao SetorImpressao,
+    IReadOnlyList<GrupoCardapio> Grupos)
+{
+    public bool TemModificadores => Grupos.Count > 0;
+}
+
+public record CategoriaCardapio(int Id, string Nome, IReadOnlyList<ProdutoCardapio> Produtos);
+
+public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
+{
+    public async Task<List<CategoriaCardapio>> ObterCardapioAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var produtos = await db.Produtos.AsNoTracking()
+            .Where(p => p.Ativo)
+            .Include(p => p.Categoria)
+            .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.Opcoes)
+            .ToListAsync();
+
+        return produtos
+            .GroupBy(p => p.Categoria)
+            .OrderBy(g => g.Key.Id)
+            .Select(g => new CategoriaCardapio(g.Key.Id, g.Key.Nome, g.OrderBy(p => p.Nome).Select(Mapear).ToList()))
+            .ToList();
+    }
+
+    private static ProdutoCardapio Mapear(Produto produto) => new(
+        produto.Id,
+        produto.Nome,
+        produto.Preco,
+        produto.CategoriaId,
+        produto.Categoria.Nome,
+        produto.TipoItem,
+        produto.SetorImpressao,
+        produto.GruposModificadores
+            .Select(v => v.GrupoModificador)
+            .OrderByDescending(g => g.Obrigatorio).ThenBy(g => g.Nome)
+            .Select(g => new GrupoCardapio(g.Id, g.Nome, g.Obrigatorio, g.SelecaoUnica,
+                g.Opcoes.OrderBy(o => o.Id).Select(o => new OpcaoCardapio(o.Id, o.Nome)).ToList()))
+            .ToList());
+
+    // ---------- Administração ----------
+
+    public async Task<List<CategoriaProduto>> ListarCategoriasAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.CategoriasProdutos.AsNoTracking().OrderBy(c => c.Id).ToListAsync();
+    }
+
+    public async Task<List<Produto>> ListarProdutosAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.Produtos.AsNoTracking()
+            .Include(p => p.Categoria)
+            .Include(p => p.GruposModificadores)
+            .OrderBy(p => p.CategoriaId).ThenBy(p => p.Nome)
+            .ToListAsync();
+    }
+
+    public async Task<List<GrupoModificador>> ListarGruposAsync()
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db.GruposModificadores.AsNoTracking().Include(g => g.Opcoes).OrderBy(g => g.Nome).ToListAsync();
+    }
+
+    public async Task SalvarCategoriaAsync(int id, string nome)
+    {
+        if (string.IsNullOrWhiteSpace(nome))
+        {
+            throw new RegraNegocioException("Informe o nome da categoria.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        nome = nome.Trim();
+        if (await db.CategoriasProdutos.AnyAsync(c => c.Nome == nome && c.Id != id))
+        {
+            throw new RegraNegocioException("Já existe uma categoria com esse nome.");
+        }
+
+        var categoria = id == 0 ? new CategoriaProduto() : await db.CategoriasProdutos.FindAsync(id)
+            ?? throw new RegraNegocioException("Categoria não encontrada.");
+        categoria.Nome = nome;
+        if (id == 0)
+        {
+            db.CategoriasProdutos.Add(categoria);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    public async Task SalvarProdutoAsync(Produto dados, IReadOnlyCollection<int> gruposModificadores)
+    {
+        if (string.IsNullOrWhiteSpace(dados.Nome))
+        {
+            throw new RegraNegocioException("Informe o nome do produto.");
+        }
+
+        if (dados.Preco < 0)
+        {
+            throw new RegraNegocioException("O preço não pode ser negativo.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        if (!await db.CategoriasProdutos.AnyAsync(c => c.Id == dados.CategoriaId))
+        {
+            throw new RegraNegocioException("Selecione uma categoria válida.");
+        }
+
+        var produto = dados.Id == 0
+            ? new Produto()
+            : await db.Produtos.Include(p => p.GruposModificadores).FirstOrDefaultAsync(p => p.Id == dados.Id)
+              ?? throw new RegraNegocioException("Produto não encontrado.");
+
+        produto.Nome = dados.Nome.Trim();
+        produto.Preco = CalculoConta.Arredondar(dados.Preco);
+        produto.CategoriaId = dados.CategoriaId;
+        produto.TipoItem = dados.TipoItem;
+        produto.SetorImpressao = dados.TipoItem == TipoItem.Rodizio ? SetorImpressao.Nenhum : dados.SetorImpressao;
+        produto.Ativo = dados.Ativo;
+
+        produto.GruposModificadores.Clear();
+        foreach (var grupoId in gruposModificadores.Distinct())
+        {
+            produto.GruposModificadores.Add(new GrupoModificadorProduto { GrupoModificadorId = grupoId });
+        }
+
+        if (produto.Id == 0)
+        {
+            db.Produtos.Add(produto);
+        }
+
+        await db.SaveChangesAsync();
+    }
+
+    public async Task SalvarGrupoAsync(int id, string nome, bool obrigatorio, bool selecaoUnica, IReadOnlyList<string> opcoes)
+    {
+        var nomesOpcoes = opcoes.Select(o => o.Trim()).Where(o => o.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (string.IsNullOrWhiteSpace(nome))
+        {
+            throw new RegraNegocioException("Informe o nome do grupo.");
+        }
+
+        if (nomesOpcoes.Count == 0)
+        {
+            throw new RegraNegocioException("Informe ao menos uma opção.");
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        nome = nome.Trim();
+        if (await db.GruposModificadores.AnyAsync(g => g.Nome == nome && g.Id != id))
+        {
+            throw new RegraNegocioException("Já existe um grupo com esse nome.");
+        }
+
+        var grupo = id == 0
+            ? new GrupoModificador()
+            : await db.GruposModificadores.Include(g => g.Opcoes).FirstOrDefaultAsync(g => g.Id == id)
+              ?? throw new RegraNegocioException("Grupo não encontrado.");
+        grupo.Nome = nome;
+        grupo.Obrigatorio = obrigatorio;
+        grupo.SelecaoUnica = selecaoUnica;
+
+        foreach (var removida in grupo.Opcoes.Where(o => !nomesOpcoes.Contains(o.Nome, StringComparer.OrdinalIgnoreCase)).ToList())
+        {
+            grupo.Opcoes.Remove(removida);
+        }
+
+        foreach (var nova in nomesOpcoes.Where(n => !grupo.Opcoes.Any(o => string.Equals(o.Nome, n, StringComparison.OrdinalIgnoreCase))))
+        {
+            grupo.Opcoes.Add(new OpcaoModificador { Nome = nova });
+        }
+
+        if (id == 0)
+        {
+            db.GruposModificadores.Add(grupo);
+        }
+
+        await db.SaveChangesAsync();
+    }
+}

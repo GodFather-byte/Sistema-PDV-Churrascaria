@@ -5,5 +5,6 @@ public enum SetorImpressao
     Nenhum,
     BarCopa,
     Cozinha,
-    Churrasqueira
+    Churrasqueira,
+    Caixa
 }

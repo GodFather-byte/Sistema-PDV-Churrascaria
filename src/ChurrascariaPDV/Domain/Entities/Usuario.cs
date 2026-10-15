@@ -8,5 +8,6 @@ public class Usuario
     public string Nome { get; set; } = string.Empty;
     public string PinAcesso { get; set; } = string.Empty;
     public PerfilUsuario Perfil { get; set; }
+    public bool Ativo { get; set; } = true;
     public ICollection<Pedido> Pedidos { get; set; } = new List<Pedido>();
 }

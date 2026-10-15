@@ -17,6 +17,7 @@ public class SessaoUsuario(ProtectedLocalStorage storage, UsuarioService usuario
 
     public async Task<UsuarioLogado?> RestaurarAsync(string area)
     {
+        Usuario = null;
         try
         {
             var salvo = await storage.GetAsync<SessaoSalva>(Chave(area));

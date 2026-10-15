@@ -11,7 +11,7 @@ public class ItemCarrinho
     public IReadOnlyList<string> OpcoesNomes { get; init; } = [];
     public string? Observacao { get; init; }
 
-    public decimal Total => CalculoConta.Arredondar(Quantidade * Produto.Preco);
+    public decimal Total => CalculoConta.Arredondar(Quantidade * CalculoPrecoProduto.Calcular(Produto, OpcoesIds));
 
     public string Detalhes => string.Join(", ", OpcoesNomes.Concat(string.IsNullOrWhiteSpace(Observacao) ? [] : [Observacao!]));
 

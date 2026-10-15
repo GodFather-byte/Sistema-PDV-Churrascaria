@@ -156,6 +156,9 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<bool>("Obrigatorio")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("Sabores")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("SelecaoUnica")
                         .HasColumnType("INTEGER");
 
@@ -181,6 +184,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             DestacarObservacoes = false,
                             Nome = "Ponto da Carne",
                             Obrigatorio = true,
+                            Sabores = false,
                             SelecaoUnica = true,
                             SugerePessoas = false
                         },
@@ -190,6 +194,7 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             DestacarObservacoes = false,
                             Nome = "Preferência Bebida",
                             Obrigatorio = false,
+                            Sabores = false,
                             SelecaoUnica = false,
                             SugerePessoas = false
                         });
@@ -880,6 +885,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("Preco")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
                     b.HasIndex("GrupoModificadorId", "Nome")
@@ -892,37 +901,43 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                         {
                             Id = 1,
                             GrupoModificadorId = 1,
-                            Nome = "Malpassada"
+                            Nome = "Malpassada",
+                            Preco = 0m
                         },
                         new
                         {
                             Id = 2,
                             GrupoModificadorId = 1,
-                            Nome = "Ao Ponto"
+                            Nome = "Ao Ponto",
+                            Preco = 0m
                         },
                         new
                         {
                             Id = 3,
                             GrupoModificadorId = 1,
-                            Nome = "Bem Passada"
+                            Nome = "Bem Passada",
+                            Preco = 0m
                         },
                         new
                         {
                             Id = 4,
                             GrupoModificadorId = 2,
-                            Nome = "Com Gelo e Limão"
+                            Nome = "Com Gelo e Limão",
+                            Preco = 0m
                         },
                         new
                         {
                             Id = 5,
                             GrupoModificadorId = 2,
-                            Nome = "Sem Gelo"
+                            Nome = "Sem Gelo",
+                            Preco = 0m
                         },
                         new
                         {
                             Id = 6,
                             GrupoModificadorId = 2,
-                            Nome = "2 Copos"
+                            Nome = "2 Copos",
+                            Preco = 0m
                         });
                 });
 
@@ -1086,6 +1101,11 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<bool>("ControlaEstoque")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("MaximoSabores")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(2);
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -1097,6 +1117,12 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<decimal>("QuantidadeEstoque")
                         .HasPrecision(10, 3)
                         .HasColumnType("TEXT");
+
+                    b.Property<string>("RegraPrecoSabores")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("MaiorValor");
 
                     b.Property<string>("SetorImpressaoId")
                         .HasColumnType("TEXT")

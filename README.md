@@ -127,6 +127,17 @@ o pedido continua salvo, o item aparece como “não impresso” no caixa e pode
 
 ## Modificadores e tipos de estabelecimento
 
+### Sabores e meio a meio
+
+Cadastre um grupo de opções marcado como **Grupo de sabores**, obrigatório e com múltipla escolha.
+Cada linha usa `Nome | preço`, por exemplo `Calabresa | 50,00` e `Especial | 70,00`.
+Vincule apenas um grupo de sabores por produto e configure nele o limite (1–8) e a regra:
+**Maior valor**, **Média** simples ou **Soma** dos sabores escolhidos.
+As partes são iguais: duas escolhas representam meio a meio. O resultado substitui o preço-base;
+opções dos outros grupos (borda, extras) são somadas como adicionais, uma vez por unidade.
+O carrinho mostra o mesmo cálculo validado novamente no servidor. Preço e sabores ficam registrados
+no pedido para não alterar vendas anteriores quando o cardápio for editado.
+
 Em **Cardápio** (`/admin/produtos`), cada grupo permite configurar:
 
 - escolha obrigatória ou opcional e seleção única ou múltipla;

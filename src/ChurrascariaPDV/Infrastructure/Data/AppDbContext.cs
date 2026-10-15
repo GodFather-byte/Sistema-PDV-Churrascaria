@@ -87,6 +87,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Produto>(entity =>
         {
             entity.Property(produto => produto.Preco).HasPrecision(10, 2);
+            entity.Property(produto => produto.RegraPrecoSabores).HasConversion<string>().HasDefaultValue(Domain.Enums.RegraPrecoSabores.MaiorValor);
+            entity.Property(produto => produto.MaximoSabores).HasDefaultValue(2);
             entity.Property(produto => produto.QuantidadeEstoque).HasPrecision(10, 3);
             entity.Property(produto => produto.TipoItem).HasConversion<string>();
             entity.Property(produto => produto.SetorImpressaoId).HasColumnName("SetorImpressao");
@@ -107,6 +109,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<OpcaoModificador>(entity =>
         {
+            entity.Property(opcao => opcao.Preco).HasPrecision(10, 2);
             entity.HasIndex(opcao => new { opcao.GrupoModificadorId, opcao.Nome }).IsUnique();
             entity.Property(opcao => opcao.Nome).HasMaxLength(80);
             entity.HasOne(opcao => opcao.GrupoModificador)

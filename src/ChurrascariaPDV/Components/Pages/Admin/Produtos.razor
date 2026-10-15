@@ -123,6 +123,20 @@
                         </button>
                     }
                 </div>
+                <div class="row g-2 mb-2">
+                    <div class="col">
+                        <label class="form-label">Preço com sabores (substitui preço-base)</label>
+                        <select class="form-select" @bind="_produto.RegraPrecoSabores">
+                            <option value="@RegraPrecoSabores.MaiorValor">Maior valor</option>
+                            <option value="@RegraPrecoSabores.Media">Média</option>
+                            <option value="@RegraPrecoSabores.Soma">Soma</option>
+                        </select>
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Máximo de sabores (partes iguais)</label>
+                        <input type="number" min="1" max="8" class="form-control" @bind="_produto.MaximoSabores" />
+                    </div>
+                </div>
                 <div class="form-check">
                     <input id="produto-ativo" class="form-check-input" type="checkbox" @bind="_produto.Ativo" />
                     <label class="form-check-label" for="produto-ativo">Ativo (aparece no cardápio)</label>
@@ -175,8 +189,10 @@
                 </select>
                 <label class="d-block mb-2"><input type="checkbox" @bind="_grupoEditando.DestacarObservacoes" /> Destacar observações na produção</label>
                 <label class="d-block mb-2"><input type="checkbox" @bind="_grupoEditando.SugerePessoas" /> Usar quantidade para sugerir pessoas da mesa</label>
+                <label class="d-block mb-2"><input type="checkbox" @bind="_grupoEditando.Sabores" /> Grupo de sabores (obrigatório, múltipla escolha)</label>
                 <p class="text-muted small">Com opções, a regra se aplica quando houver uma escolha. Sem opções, a regra se aplica sempre; nesse caso o grupo não pode ser obrigatório.</p>
-                <label class="form-label">Opções (uma por linha)</label>
+                <label class="form-label">Opções (uma por linha: Nome | preço)</label>
+                <p class="text-muted small">Nos sabores, informe o preço inteiro do sabor. Nas outras opções, o preço é um adicional. Sem preço = zero.</p>
                 <textarea class="form-control" rows="5" @bind="_opcoesGrupo"></textarea>
             }
         </ChildContent>
@@ -218,6 +234,8 @@
             ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, Ativo = true }
             : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressaoId = produto.SetorImpressaoId, Ativo = produto.Ativo, ControlaEstoque = produto.ControlaEstoque, QuantidadeEstoque = produto.QuantidadeEstoque };
         _precoProduto = Formato.ValorEditavel(_produto.Preco);
+        _produto.RegraPrecoSabores = produto?.RegraPrecoSabores ?? RegraPrecoSabores.MaiorValor;
+        _produto.MaximoSabores = produto?.MaximoSabores ?? 2;
         _gruposProduto = produto?.GruposModificadores.Select(g => g.GrupoModificadorId).ToHashSet() ?? [];
     }
 
@@ -256,9 +274,9 @@
             : new GrupoModificador
             {
                 Id = grupo.Id, Nome = grupo.Nome, Obrigatorio = grupo.Obrigatorio, SelecaoUnica = grupo.SelecaoUnica,
-                SetorImpressaoId = grupo.SetorImpressaoId, DestacarObservacoes = grupo.DestacarObservacoes, SugerePessoas = grupo.SugerePessoas
+                SetorImpressaoId = grupo.SetorImpressaoId, DestacarObservacoes = grupo.DestacarObservacoes, SugerePessoas = grupo.SugerePessoas, Sabores = grupo.Sabores
             };
-        _opcoesGrupo = grupo is null ? string.Empty : string.Join(Environment.NewLine, grupo.Opcoes.Select(o => o.Nome));
+        _opcoesGrupo = grupo is null ? string.Empty : string.Join(Environment.NewLine, grupo.Opcoes.Select(o => $"{o.Nome} | {Formato.ValorEditavel(o.Preco)}"));
     }
 
     private async Task SalvarGrupoAsync()
@@ -266,10 +284,20 @@
         if (_grupoEditando is null) return;
         await ExecutarAsync(async () =>
         {
-            var opcoes = (_opcoesGrupo ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var linhas = (_opcoesGrupo ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var precos = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            foreach (var linha in linhas)
+            {
+                var partes = linha.Split('|', StringSplitOptions.TrimEntries);
+                var preco = 0m;
+                if (partes.Length > 2 || string.IsNullOrWhiteSpace(partes[0]) ||
+                    (partes.Length == 2 && !Formato.TentarLerValor(partes[1], out preco)) ||
+                    !precos.TryAdd(partes[0], preco))
+                    throw new RegraNegocioException("Informe opções únicas no formato Nome | preço.");
+            }
             await CardapioService.SalvarGrupoAsync(
-                _grupoEditando.Id, _grupoEditando.Nome, _grupoEditando.Obrigatorio, _grupoEditando.SelecaoUnica, opcoes,
-                _grupoEditando.SetorImpressaoId, _grupoEditando.DestacarObservacoes, _grupoEditando.SugerePessoas);
+                _grupoEditando.Id, _grupoEditando.Nome, _grupoEditando.Obrigatorio, _grupoEditando.SelecaoUnica, precos.Keys.ToList(),
+                _grupoEditando.SetorImpressaoId, _grupoEditando.DestacarObservacoes, _grupoEditando.SugerePessoas, _grupoEditando.Sabores, precos);
             _grupoEditando = null;
         }, "Grupo salvo.");
     }

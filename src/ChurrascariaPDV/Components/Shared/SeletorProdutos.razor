@@ -42,6 +42,10 @@
                 <div class="grupo-modificador">
                     <div class="grupo-modificador-titulo">
                         @grupo.Nome
+                        @if (grupo.Sabores)
+                        {
+                            <span class="text-muted small">até @produto.MaximoSabores sabores · partes iguais · @produto.RegraPrecoSabores</span>
+                        }
                         @if (grupo.Obrigatorio)
                         {
                             <span class="badge bg-warning text-dark">obrigatório</span>
@@ -57,6 +61,10 @@
                             <button type="button" class="opcao @(_opcoesSelecionadas.Contains(opcao.Id) ? "ativo" : string.Empty)"
                                     @onclick="() => AlternarOpcao(grupo, opcao)">
                                 @opcao.Nome
+                                @if (opcao.Preco > 0 || grupo.Sabores)
+                                {
+                                    <span>@Formato.Moeda(opcao.Preco)</span>
+                                }
                             </button>
                         }
                     </div>
@@ -80,7 +88,7 @@
     <Rodape>
         <button type="button" class="btn btn-lg btn-secondary" @onclick="FecharModificadores">Cancelar</button>
         <button type="button" class="btn btn-lg btn-brasa flex-grow-1" @onclick="ConfirmarModificadores">
-            Adicionar @(_produtoModificador is null ? string.Empty : Formato.Moeda(_produtoModificador.Preco * _quantidade))
+            Adicionar @PrecoSelecao
         </button>
     </Rodape>
 </Modal>
@@ -99,6 +107,21 @@
     private string? _observacao;
     private int _quantidade = 1;
     private string? _erroModificador;
+    private string PrecoSelecao
+    {
+        get
+        {
+            if (_produtoModificador is null) return string.Empty;
+            try
+            {
+                return Formato.Moeda(CalculoPrecoProduto.Calcular(_produtoModificador, _opcoesSelecionadas) * _quantidade);
+            }
+            catch (RegraNegocioException ex)
+            {
+                return $"· {ex.Message}";
+            }
+        }
+    }
 
     private IEnumerable<ProdutoCardapio> ProdutosVisiveis => string.IsNullOrWhiteSpace(_busca)
         ? _categorias.FirstOrDefault(c => c.Id == _categoriaId)?.Produtos ?? []
@@ -138,6 +161,11 @@
             {
                 _opcoesSelecionadas.Remove(outra.Id);
             }
+            if (grupo.Sabores && grupo.Opcoes.Count(o => _opcoesSelecionadas.Contains(o.Id)) >= _produtoModificador!.MaximoSabores)
+            {
+                _erroModificador = $"Escolha até {_produtoModificador.MaximoSabores} sabores.";
+                return;
+            }
         }
 
         _opcoesSelecionadas.Add(opcao.Id);
@@ -151,10 +179,13 @@
             return;
         }
 
-        var faltando = produto.Grupos.FirstOrDefault(g => g.Obrigatorio && !g.Opcoes.Any(o => _opcoesSelecionadas.Contains(o.Id)));
-        if (faltando is not null)
+        try
         {
-            _erroModificador = $"Escolha: {faltando.Nome}";
+            CalculoPrecoProduto.Calcular(produto, _opcoesSelecionadas);
+        }
+        catch (RegraNegocioException ex)
+        {
+            _erroModificador = ex.Message;
             return;
         }
 

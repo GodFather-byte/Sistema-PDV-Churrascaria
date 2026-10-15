@@ -49,6 +49,7 @@ public class PedidoService(
 
         var produtoIds = novo.Itens.Select(i => i.ProdutoId).Distinct().ToList();
         var produtos = await db.Produtos
+            .Include(p => p.Categoria)
             .Include(p => p.SetorImpressao)
             .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.Opcoes)
             .Include(p => p.GruposModificadores).ThenInclude(g => g.GrupoModificador).ThenInclude(g => g.SetorImpressao)
@@ -75,7 +76,7 @@ public class PedidoService(
                 ProdutoId = produto.Id,
                 Produto = produto,
                 Quantidade = item.Quantidade,
-                PrecoUnitarioHistorico = produto.Preco,
+                PrecoUnitarioHistorico = CalculoPrecoProduto.Calcular(CardapioService.Mapear(produto), item.OpcoesIds),
                 ObservacoesModificadores = regras.Observacoes,
                 SetorImpressao = regras.Setor,
                 SetorImpressaoId = regras.Setor?.Id,
@@ -332,7 +333,7 @@ public class PedidoService(
                 throw new RegraNegocioException($"Escolha apenas uma opção de \"{grupo.Nome}\" para {produto.Nome}.");
             }
 
-            partes.AddRange(escolhidas.Select(o => o.Nome));
+            partes.AddRange(escolhidas.Select(o => grupo.Sabores ? $"1/{escolhidas.Count} {o.Nome}" : o.Nome));
             if (escolhidas.Count > 0 || grupo.Opcoes.Count == 0)
             {
                 destacarObservacoes |= grupo.DestacarObservacoes;

@@ -10,6 +10,7 @@ public class GrupoModificador
     public SetorImpressao? SetorImpressao { get; set; }
     public bool DestacarObservacoes { get; set; }
     public bool SugerePessoas { get; set; }
+    public bool Sabores { get; set; }
     public ICollection<OpcaoModificador> Opcoes { get; set; } = new List<OpcaoModificador>();
     public ICollection<GrupoModificadorProduto> Produtos { get; set; } = new List<GrupoModificadorProduto>();
 }

@@ -7,6 +7,8 @@ public class Produto
     public int Id { get; set; }
     public string Nome { get; set; } = string.Empty;
     public decimal Preco { get; set; }
+    public RegraPrecoSabores RegraPrecoSabores { get; set; }
+    public int MaximoSabores { get; set; } = 2;
     public int CategoriaId { get; set; }
     public TipoItem TipoItem { get; set; } = TipoItem.Produto;
     public string? SetorImpressaoId { get; set; }

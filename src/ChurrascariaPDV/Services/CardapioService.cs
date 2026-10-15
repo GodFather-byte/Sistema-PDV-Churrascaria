@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChurrascariaPDV.Services;
 
-public record OpcaoCardapio(int Id, string Nome);
+public record OpcaoCardapio(int Id, string Nome, decimal Preco = 0);
 
-public record GrupoCardapio(int Id, string Nome, bool Obrigatorio, bool SelecaoUnica, IReadOnlyList<OpcaoCardapio> Opcoes);
+public record GrupoCardapio(int Id, string Nome, bool Obrigatorio, bool SelecaoUnica, IReadOnlyList<OpcaoCardapio> Opcoes, bool Sabores = false);
 
 public record ProdutoCardapio(
     int Id,
@@ -17,7 +17,9 @@ public record ProdutoCardapio(
     string Categoria,
     TipoItem TipoItem,
     SetorImpressao? SetorImpressao,
-    IReadOnlyList<GrupoCardapio> Grupos)
+    IReadOnlyList<GrupoCardapio> Grupos,
+    RegraPrecoSabores RegraPrecoSabores = RegraPrecoSabores.MaiorValor,
+    int MaximoSabores = 2)
 {
     public bool TemModificadores => Grupos.Any(grupo => grupo.Opcoes.Count > 0);
 }
@@ -43,7 +45,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             .ToList();
     }
 
-    private static ProdutoCardapio Mapear(Produto produto) => new(
+    internal static ProdutoCardapio Mapear(Produto produto) => new(
         produto.Id,
         produto.Nome,
         produto.Preco,
@@ -55,8 +57,8 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             .Select(v => v.GrupoModificador)
             .OrderByDescending(g => g.Obrigatorio).ThenBy(g => g.Nome)
             .Select(g => new GrupoCardapio(g.Id, g.Nome, g.Obrigatorio, g.SelecaoUnica,
-                g.Opcoes.OrderBy(o => o.Id).Select(o => new OpcaoCardapio(o.Id, o.Nome)).ToList()))
-            .ToList());
+                g.Opcoes.OrderBy(o => o.Id).Select(o => new OpcaoCardapio(o.Id, o.Nome, o.Preco)).ToList(), g.Sabores))
+            .ToList(), produto.RegraPrecoSabores, produto.MaximoSabores);
 
     // ---------- Administração ----------
 
@@ -126,6 +128,11 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             throw new RegraNegocioException("Selecione um tipo de item válido.");
         }
 
+        if (!Enum.IsDefined(dados.RegraPrecoSabores) || dados.MaximoSabores is < 1 or > 8)
+        {
+            throw new RegraNegocioException("Selecione a regra de preço e um limite de 1 a 8 sabores.");
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync();
         if (!await db.CategoriasProdutos.AnyAsync(c => c.Id == dados.CategoriaId))
         {
@@ -143,6 +150,10 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         {
             throw new RegraNegocioException("Selecione grupos de opções válidos.");
         }
+        if (await db.GruposModificadores.CountAsync(g => gruposIds.Contains(g.Id) && g.Sabores) > 1)
+        {
+            throw new RegraNegocioException("Vincule apenas um grupo de sabores ao produto.");
+        }
 
         var produto = dados.Id == 0
             ? new Produto()
@@ -151,6 +162,8 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
 
         produto.Nome = dados.Nome.Trim();
         produto.Preco = CalculoConta.Arredondar(dados.Preco);
+        produto.RegraPrecoSabores = dados.RegraPrecoSabores;
+        produto.MaximoSabores = dados.MaximoSabores;
         produto.CategoriaId = dados.CategoriaId;
         produto.TipoItem = dados.TipoItem;
         produto.SetorImpressaoId = setorId;
@@ -173,12 +186,21 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
 
     public async Task SalvarGrupoAsync(
         int id, string nome, bool obrigatorio, bool selecaoUnica, IReadOnlyList<string> opcoes,
-        string? setorImpressaoId = null, bool destacarObservacoes = false, bool sugerePessoas = false)
+        string? setorImpressaoId = null, bool destacarObservacoes = false, bool sugerePessoas = false,
+        bool sabores = false, IReadOnlyDictionary<string, decimal>? precosOpcoes = null)
     {
         var nomesOpcoes = opcoes.Select(o => o.Trim()).Where(o => o.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (string.IsNullOrWhiteSpace(nome))
         {
             throw new RegraNegocioException("Informe o nome do grupo.");
+        }
+        if (nomesOpcoes.Any(n => n.Length > 80) || precosOpcoes?.Any(p => p.Value < 0 || !nomesOpcoes.Contains(p.Key, StringComparer.OrdinalIgnoreCase)) == true)
+        {
+            throw new RegraNegocioException("Informe opções com até 80 caracteres e preços não negativos.");
+        }
+        if (sabores && (nomesOpcoes.Count == 0 || selecaoUnica || !obrigatorio))
+        {
+            throw new RegraNegocioException("O grupo de sabores deve ser obrigatório, permitir múltiplas escolhas e ter opções.");
         }
 
         if (nomesOpcoes.Count == 0 && (obrigatorio || (!sugerePessoas && !destacarObservacoes && string.IsNullOrWhiteSpace(setorImpressaoId))))
@@ -203,12 +225,19 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             ? new GrupoModificador()
             : await db.GruposModificadores.Include(g => g.Opcoes).FirstOrDefaultAsync(g => g.Id == id)
               ?? throw new RegraNegocioException("Grupo não encontrado.");
+        if (sabores && await db.GruposModificadoresProdutos.AnyAsync(v =>
+                v.GrupoModificadorId == id && v.Produto.GruposModificadores.Any(outro =>
+                    outro.GrupoModificadorId != id && outro.GrupoModificador.Sabores)))
+        {
+            throw new RegraNegocioException("Um produto vinculado já possui outro grupo de sabores.");
+        }
         grupo.Nome = nome;
         grupo.Obrigatorio = obrigatorio;
         grupo.SelecaoUnica = selecaoUnica;
         grupo.SetorImpressaoId = setorImpressaoId;
         grupo.DestacarObservacoes = destacarObservacoes;
         grupo.SugerePessoas = sugerePessoas;
+        grupo.Sabores = sabores;
 
         foreach (var removida in grupo.Opcoes.Where(o => !nomesOpcoes.Contains(o.Nome, StringComparer.OrdinalIgnoreCase)).ToList())
         {
@@ -218,6 +247,14 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         foreach (var nova in nomesOpcoes.Where(n => !grupo.Opcoes.Any(o => string.Equals(o.Nome, n, StringComparison.OrdinalIgnoreCase))))
         {
             grupo.Opcoes.Add(new OpcaoModificador { Nome = nova });
+        }
+        if (precosOpcoes is not null)
+        {
+            foreach (var opcao in grupo.Opcoes)
+            {
+                var entrada = precosOpcoes.FirstOrDefault(p => string.Equals(p.Key, opcao.Nome, StringComparison.OrdinalIgnoreCase));
+                opcao.Preco = CalculoConta.Arredondar(entrada.Value);
+            }
         }
 
         if (id == 0)

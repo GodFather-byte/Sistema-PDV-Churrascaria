@@ -118,9 +118,50 @@ public sealed class LicencaTests : IDisposable
         Assert.Matches("^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$", codigo);
     }
 
+    private string Resposta(StatusVerificacao status, string? arquivo = null, string maquina = Maquina, ECDsa? chave = null) =>
+        FormatoLicenca.Assinar(new RespostaVerificacao(status, maquina, "L1", arquivo, "Mensalidade em atraso", DateTimeOffset.Now),
+            chave ?? _chave);
+
+    [Fact]
+    public async Task RespostaOnlineRenovaBloqueiaEDesbloqueia()
+    {
+        await using var ambiente = await CriarAsync();
+        var licencas = Criar(ambiente);
+        File.WriteAllText(_arquivo, Emitir(Hoje.AddDays(-30)));
+        Assert.Equal(EstadoLicenca.Vencida, (await licencas.ObterSituacaoAsync()).Estado);
+
+        await licencas.AplicarRespostaOnlineAsync(Resposta(StatusVerificacao.Ativa, Emitir(Hoje.AddMonths(1))));
+        Assert.Equal(EstadoLicenca.Ativa, (await licencas.ObterSituacaoAsync()).Estado);
+
+        await licencas.AplicarRespostaOnlineAsync(Resposta(StatusVerificacao.Bloqueada));
+        var bloqueada = await licencas.ObterSituacaoAsync();
+        Assert.Equal(EstadoLicenca.Bloqueada, bloqueada.Estado);
+        Assert.Equal("Mensalidade em atraso", bloqueada.Problema);
+        await Assert.ThrowsAsync<RegraNegocioException>(licencas.GarantirPodeVenderAsync);
+
+        await licencas.AplicarRespostaOnlineAsync(Resposta(StatusVerificacao.Ativa, Emitir(Hoje.AddMonths(1))));
+        Assert.Equal(EstadoLicenca.Ativa, (await licencas.ObterSituacaoAsync()).Estado);
+    }
+
+    [Fact]
+    public async Task RespostaOnlineFalsaOuDeOutroPcNaoAlteraNada()
+    {
+        await using var ambiente = await CriarAsync();
+        var licencas = Criar(ambiente);
+        File.WriteAllText(_arquivo, Emitir(Hoje.AddDays(30)));
+        using var outraChave = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+        await Assert.ThrowsAsync<RegraNegocioException>(() => licencas.AplicarRespostaOnlineAsync(Resposta(StatusVerificacao.Bloqueada, chave: outraChave)));
+        await Assert.ThrowsAsync<RegraNegocioException>(() => licencas.AplicarRespostaOnlineAsync(Resposta(StatusVerificacao.Bloqueada, maquina: "ZZZZ-ZZZZ-ZZZZ-ZZZZ")));
+        await licencas.AplicarRespostaOnlineAsync(Resposta(StatusVerificacao.NaoEncontrada));
+        Assert.Equal(EstadoLicenca.Ativa, (await licencas.ObterSituacaoAsync()).Estado);
+        Assert.Equal("L1", licencas.CriarPedidoVerificacao("1.0").LicencaId);
+    }
+
     public void Dispose()
     {
         _chave.Dispose();
         File.Delete(_arquivo);
+        File.Delete(Path.ChangeExtension(_arquivo, ".bloqueio"));
     }
 }

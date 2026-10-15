@@ -1,0 +1,67 @@
+@page "/"
+@inject LicencasService Servico
+
+<PageTitle>Licenças PDV</PageTitle>
+
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <h1 class="h3 me-auto mb-0">Licenças</h1>
+    <input class="form-control" style="max-width: 280px" placeholder="Buscar cliente, código ou máquina"
+           @bind="_busca" @bind:event="oninput" @bind:after="CarregarAsync" />
+    <a class="btn btn-primary" href="licenca">Nova licença</a>
+</div>
+
+@if (_licencas is null)
+{
+    <p>Carregando…</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead>
+                <tr><th>Cliente</th><th>Licença</th><th>Máquina</th><th>Válida até</th><th>Situação</th><th>Último contato</th><th>Versão</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var l in _licencas)
+                {
+                    var (texto, cor) = Situacao(l);
+                    <tr role="button" @onclick='() => Navegacao.NavigateTo($"licenca/{l.Id}")'>
+                        <td>@l.Cliente</td>
+                        <td class="font-monospace">@l.Id</td>
+                        <td class="font-monospace">@l.Maquina</td>
+                        <td>@l.ValidaAte.ToString("dd/MM/yyyy")</td>
+                        <td><span class="badge bg-@cor">@texto</span></td>
+                        <td>@(l.UltimaVerificacao is { } v ? v.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "nunca")</td>
+                        <td>@l.UltimaVersao</td>
+                    </tr>
+                }
+                @if (_licencas.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-muted">Nenhuma licença encontrada.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Inject] private NavigationManager Navegacao { get; set; } = default!;
+    private List<LicencaCliente>? _licencas;
+    private string? _busca;
+
+    protected override Task OnInitializedAsync() => CarregarAsync();
+
+    private async Task CarregarAsync() => _licencas = await Servico.ListarAsync(_busca);
+
+    public static (string Texto, string Cor) Situacao(LicencaCliente l)
+    {
+        if (l.Bloqueada) return ("Bloqueada", "danger");
+        var dias = l.ValidaAte.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber;
+        return dias switch
+        {
+            < 0 => ("Vencida", "danger"),
+            <= 7 => ($"Vence em {dias} dia(s)", "warning"),
+            _ => ("Ativa", "success")
+        };
+    }
+}

@@ -111,8 +111,8 @@ public class LicencaService(IConfiguration configuration, IDbContextFactory<AppD
         switch (resposta.Status)
         {
             case StatusVerificacao.Ativa when resposta.ArquivoLicenca is { } arquivo:
-                var atual = File.Exists(Arquivo) ? (await File.ReadAllTextAsync(Arquivo)).Trim() : null;
-                if (atual != arquivo.Trim()) await InstalarAsync(arquivo);
+                // Assinaturas ECDSA mudam a cada emissão: compara o conteúdo, não o texto do arquivo.
+                if (LerArquivo().Licenca != FormatoLicenca.Ler<Licenca>(arquivo, chave)) await InstalarAsync(arquivo);
                 File.Delete(ArquivoBloqueio);
                 break;
             case StatusVerificacao.Bloqueada when resposta.LicencaId == LerArquivo().Licenca?.Id:

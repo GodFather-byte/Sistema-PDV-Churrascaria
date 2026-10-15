@@ -114,22 +114,47 @@ O arquivo é assinado digitalmente (ECDSA P-256) e conferido sem internet; edita
   não abre turno nem lança pedidos, mas recebe contas abertas, fecha o caixa, mostra relatórios e mantém os backups.
 - Atrasar o relógio do Windows não prolonga a licença (vale a data mais recente registrada nas vendas).
 - O gerente vê o **código do computador** e instala o arquivo em **Gerência > Licença** (`/admin/licenca`).
+- **Conferência online:** com internet, o caixa consulta o servidor de licenças ao iniciar (após 30 s), a cada 6 h
+  e pelo botão **Conferir agora**. Recebe sozinho a licença renovada, ou o bloqueio feito no painel.
+  Sem internet nada muda: o arquivo vale até a data de validade. As respostas são assinadas; um servidor falso não renova nem desbloqueia.
+  Um caixa ainda sem arquivo recebe a licença cadastrada para o código da sua máquina.
 
-### Emitir licenças (fornecedor)
+### Servidor e painel de licenças (fornecedor)
 
-A ferramenta `tools/GeradorLicenca` não vai no instalador. A chave privada fica **fora do repositório**
-(ex.: `C:\Users\<você>\Documents\PDV-Licencas\chave-privada.pem`); guarde cópias dela em local seguro,
-pois sem ela não é possível emitir nem renovar licenças. A chave pública correspondente está em `LicencaService`.
+O projeto `src/LicencasServidor` é o painel web do fornecedor: cadastrar clientes, emitir, renovar (+1 mês, +1 ano),
+bloquear com motivo, baixar o `.pdv`, conferir um arquivo recebido, ver o último contato de cada caixa (data, versão, IP)
+e gerenciar os acessos da equipe (senhas com 10+ caracteres, bloqueio após 5 erros). Ele também atende a API
+`POST /api/v1/verificar`, usada pelos caixas. Não vai no instalador do PDV.
 
-```powershell
-# Emitir/renovar: código do PC informado pelo cliente, nome do cliente e validade
-dotnet run --project tools/GeradorLicenca -- emitir C:\caminho\chave-privada.pem ABCD-EFGH-JKLM-NPQR "Pizzaria do João" 2026-12-31
-# Conferir um arquivo de licença
-dotnet run --project tools/GeradorLicenca -- verificar licenca-PizzariadoJoao-20261231.pdv
+A **chave privada** fica fora do repositório (ex.: `C:\Users\<você>\Documents\PDV-Licencas\chave-privada.pem`) e no servidor.
+Guarde cópias dela em local seguro: sem ela não é possível emitir nem renovar licenças; se vazar, qualquer um emite licenças.
+A chave pública correspondente está em `ChavesLicenca` (`src/Licenciamento.Comum`). O servidor não inicia com uma chave que não corresponda a ela.
+
+Configuração (variáveis de ambiente):
+
+| Variável | Uso |
+|---|---|
+| `Licencas__ChavePrivada` | Conteúdo PEM da chave privada (ou `Licencas__ArquivoChavePrivada` com o caminho do arquivo) |
+| `Admin__Usuario` / `Admin__Senha` | Cria o primeiro acesso ao painel, só se não houver nenhum. Remova a senha depois |
+| `Dados__Pasta` | Pasta do banco e das chaves de sessão (no Docker: volume `/dados`) |
+
+Rodar localmente: `dotnet run --project src/LicencasServidor` com as variáveis acima e abrir `http://localhost:5000`.
+
+**Publicar** (qualquer hospedagem com Docker: VPS, Render, Railway, Fly.io):
+
+```bash
+docker build -f src/LicencasServidor/Dockerfile -t licencas-pdv .
+docker run -d -p 8080:8080 -v licencas-dados:/dados \
+  -e Licencas__ChavePrivada="$(cat chave-privada.pem)" -e Admin__Usuario=dono -e Admin__Senha='senha-forte-aqui' licencas-pdv
 ```
 
-Envie o `.pdv` ao cliente; ele instala em **Gerência > Licença**. Para renovar, emita um novo arquivo com a nova data.
-Se o cliente trocar de computador, o código muda e é preciso emitir uma licença nova.
+A hospedagem precisa fornecer **HTTPS** (o servidor confia no proxy para o IP e o protocolo) e um **volume persistente** em `/dados`;
+sem ele, licenças e acessos se perdem a cada atualização. Depois de publicar, coloque o endereço em
+`VerificacaoOnlineService.ServidorPadrao` (ex.: `https://licencas.seudominio.com.br`) e gere uma nova versão do instalador.
+Até lá, a conferência online fica desativada e as licenças funcionam só por arquivo.
+O endereço também pode ser definido por caixa em `Licenca:Servidor` no `appsettings.json`.
+
+Se o cliente trocar de computador, o código muda: atualize o código da máquina no cadastro da licença.
 
 > Como o código-fonte é público, a licença impede o uso casual sem pagamento, mas quem compilar o código
 > pode remover a verificação. Para proteção mais forte, mantenha o repositório privado.

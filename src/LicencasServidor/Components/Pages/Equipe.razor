@@ -1,0 +1,75 @@
+@page "/equipe"
+@inject AdministradoresService Admins
+
+<PageTitle>Equipe · Licenças PDV</PageTitle>
+
+<h1 class="h3 mb-3">Equipe</h1>
+@if (_mensagem is not null)
+{
+    <div class="alert alert-@_cor">@_mensagem</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <table class="table table-sm">
+            <thead><tr><th>Usuário</th><th>Criado em</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var a in _admins)
+                {
+                    <tr>
+                        <td>@a.Usuario</td>
+                        <td>@a.CriadoEm.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                        <td class="text-end">
+                            @if (a.Usuario != _usuarioAtual)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" @onclick='() => ExecutarAsync(() => Admins.RemoverAsync(a.Id, _usuarioAtual), "Acesso removido.")'>Remover</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <h2 class="h5 mt-4">Novo acesso</h2>
+        <input class="form-control mb-2" placeholder="Usuário" @bind="_novoUsuario" />
+        <input class="form-control mb-2" type="password" placeholder="Senha (mín. @AdministradoresService.TamanhoMinimoSenha caracteres)" autocomplete="new-password" @bind="_novaSenhaAdmin" />
+        <button class="btn btn-primary" @onclick='() => ExecutarAsync(() => Admins.CriarAsync(_novoUsuario, _novaSenhaAdmin), "Acesso criado.")'>Criar</button>
+    </div>
+
+    <div class="col-lg-4">
+        <h2 class="h5">Trocar minha senha</h2>
+        <input class="form-control mb-2" type="password" placeholder="Senha atual" autocomplete="current-password" @bind="_senhaAtual" />
+        <input class="form-control mb-2" type="password" placeholder="Nova senha" autocomplete="new-password" @bind="_novaSenha" />
+        <button class="btn btn-primary" @onclick='() => ExecutarAsync(() => Admins.TrocarSenhaAsync(_usuarioAtual, _senhaAtual, _novaSenha), "Senha alterada.")'>Trocar senha</button>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> Autenticacao { get; set; } = default!;
+    private List<Administrador> _admins = [];
+    private string _usuarioAtual = string.Empty;
+    private string _novoUsuario = string.Empty, _novaSenhaAdmin = string.Empty, _senhaAtual = string.Empty, _novaSenha = string.Empty;
+    private string? _mensagem;
+    private string _cor = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _usuarioAtual = (await Autenticacao).User.Identity?.Name ?? string.Empty;
+        _admins = await Admins.ListarAsync();
+    }
+
+    private async Task ExecutarAsync(Func<Task> acao, string sucesso)
+    {
+        try
+        {
+            await acao();
+            (_mensagem, _cor) = (sucesso, "success");
+            _novoUsuario = _novaSenhaAdmin = _senhaAtual = _novaSenha = string.Empty;
+            _admins = await Admins.ListarAsync();
+        }
+        catch (RegraException ex)
+        {
+            (_mensagem, _cor) = (ex.Message, "danger");
+        }
+    }
+}

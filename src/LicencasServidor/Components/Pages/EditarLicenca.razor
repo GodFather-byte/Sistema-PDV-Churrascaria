@@ -1,0 +1,108 @@
+@page "/licenca/{Id?}"
+@inject LicencasService Servico
+@inject NavigationManager Navegacao
+
+<PageTitle>Licença · Licenças PDV</PageTitle>
+
+<a href="">← Licenças</a>
+<h1 class="h3 my-3">@(string.IsNullOrEmpty(_dados.Id) ? "Nova licença" : $"Licença {_dados.Id}")</h1>
+
+@if (_mensagem is not null)
+{
+    <div class="alert alert-@_corMensagem">@_mensagem</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <label class="form-label">Cliente</label>
+        <input class="form-control mb-2" maxlength="120" @bind="_dados.Cliente" />
+        <label class="form-label">Contato (telefone, e-mail)</label>
+        <input class="form-control mb-2" maxlength="200" @bind="_dados.Contato" />
+        <label class="form-label">Código do computador do caixa</label>
+        <input class="form-control mb-2 font-monospace" maxlength="19" placeholder="ABCD-EFGH-JKLM-NPQR" @bind="_dados.Maquina" />
+        <div class="form-text mb-2">O cliente vê o código em Gerência &gt; Licença no PDV.</div>
+
+        <label class="form-label">Válida até</label>
+        <div class="d-flex gap-2 mb-2">
+            <input type="date" class="form-control" style="max-width: 200px" @bind="_dados.ValidaAte" />
+            <button class="btn btn-outline-secondary" @onclick="() => Estender(1)">+1 mês</button>
+            <button class="btn btn-outline-secondary" @onclick="() => Estender(12)">+1 ano</button>
+        </div>
+
+        <div class="form-check mb-2">
+            <input id="bloqueada" type="checkbox" class="form-check-input" @bind="_dados.Bloqueada" />
+            <label class="form-check-label" for="bloqueada">Bloqueada (o caixa fica somente leitura na próxima conferência online)</label>
+        </div>
+        @if (_dados.Bloqueada)
+        {
+            <label class="form-label">Motivo do bloqueio (aparece para o cliente)</label>
+            <input class="form-control mb-2" maxlength="250" @bind="_dados.MotivoBloqueio" />
+        }
+
+        <label class="form-label">Observações internas</label>
+        <textarea class="form-control mb-3" rows="3" maxlength="1000" @bind="_dados.Observacoes"></textarea>
+
+        <button class="btn btn-primary" @onclick="SalvarAsync">Salvar</button>
+    </div>
+
+    @if (_arquivo is not null)
+    {
+        <div class="col-lg-6">
+            <h2 class="h5">Arquivo de licença</h2>
+            <p class="text-muted">
+                Com internet, o caixa recebe a licença sozinho em até 6 horas (ou pelo botão "Conferir agora" no PDV).
+                Sem internet, envie o arquivo ao cliente para instalar em Gerência &gt; Licença.
+            </p>
+            <a class="btn btn-outline-primary mb-4" download="licenca-@(_dados.Id).pdv"
+               href="data:text/plain;charset=utf-8,@Uri.EscapeDataString(_arquivo)">Baixar licenca.pdv</a>
+            <div class="form-text mb-4">O arquivo reflete os dados salvos; salve antes de baixar.</div>
+
+            <h2 class="h5">Último contato do caixa</h2>
+            <dl class="row">
+                <dt class="col-5">Data</dt><dd class="col-7">@(_dados.UltimaVerificacao?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "nunca")</dd>
+                <dt class="col-5">Versão do PDV</dt><dd class="col-7">@(_dados.UltimaVersao ?? "-")</dd>
+                <dt class="col-5">IP</dt><dd class="col-7">@(_dados.UltimoIp ?? "-")</dd>
+                <dt class="col-5">Conferências</dt><dd class="col-7">@_dados.TotalVerificacoes</dd>
+                <dt class="col-5">Cadastrada em</dt><dd class="col-7">@_dados.CriadaEm.ToLocalTime().ToString("dd/MM/yyyy")</dd>
+            </dl>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    private LicencaCliente _dados = NovaLicenca();
+    private string? _arquivo;
+    private string? _mensagem;
+    private string _corMensagem = "success";
+
+    private static LicencaCliente NovaLicenca() => new() { ValidaAte = DateOnly.FromDateTime(DateTime.Today).AddMonths(1) };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _dados = string.IsNullOrEmpty(Id) ? NovaLicenca() : await Servico.ObterAsync(Id) ?? NovaLicenca();
+        _arquivo = string.IsNullOrEmpty(_dados.Id) ? null : Servico.GerarArquivo(_dados);
+    }
+
+    private void Estender(int meses)
+    {
+        var hoje = DateOnly.FromDateTime(DateTime.Today);
+        _dados.ValidaAte = (_dados.ValidaAte < hoje ? hoje : _dados.ValidaAte).AddMonths(meses);
+    }
+
+    private async Task SalvarAsync()
+    {
+        try
+        {
+            var novo = string.IsNullOrEmpty(_dados.Id);
+            _dados = await Servico.SalvarAsync(_dados);
+            _arquivo = Servico.GerarArquivo(_dados);
+            (_mensagem, _corMensagem) = ("Licença salva.", "success");
+            if (novo) Navegacao.NavigateTo($"licenca/{_dados.Id}", replace: true);
+        }
+        catch (RegraException ex)
+        {
+            (_mensagem, _corMensagem) = (ex.Message, "danger");
+        }
+    }
+}

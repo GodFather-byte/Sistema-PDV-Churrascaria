@@ -1,0 +1,12 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout)">
+            <NotAuthorized><RedirecionarLogin /></NotAuthorized>
+        </AuthorizeRouteView>
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout)">
+            <h1>Página não encontrada</h1>
+        </LayoutView>
+    </NotFound>
+</Router>

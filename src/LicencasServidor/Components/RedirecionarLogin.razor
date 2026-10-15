@@ -1,0 +1,5 @@
+@inject NavigationManager Navegacao
+
+@code {
+    protected override void OnInitialized() => Navegacao.NavigateTo("entrar", forceLoad: true);
+}

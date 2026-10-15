@@ -32,6 +32,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ProtecaoPin>();
 builder.Services.AddSingleton(sp => new LicencaService(sp.GetRequiredService<IConfiguration>(),
     sp.GetRequiredService<IDbContextFactory<AppDbContext>>()));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<VerificacaoOnlineService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<VerificacaoOnlineService>());
 builder.Services.AddHostedService<BackupBancoService>();
 
 builder.Services.AddScoped<UsuarioService>();

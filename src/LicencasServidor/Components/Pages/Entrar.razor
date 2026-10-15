@@ -1,0 +1,27 @@
+@page "/entrar"
+@attribute [AllowAnonymous]
+
+<PageTitle>Entrar · Licenças PDV</PageTitle>
+
+<div class="mx-auto mt-5" style="max-width: 360px">
+    <h1 class="h4 mb-3">Painel de licenças</h1>
+    @if (Erro == 1)
+    {
+        <div class="alert alert-danger">Usuário ou senha incorretos.</div>
+    }
+    else if (Erro == 2)
+    {
+        <div class="alert alert-danger">Muitas tentativas incorretas. Aguarde alguns minutos.</div>
+    }
+    <form method="post" action="conta/entrar">
+        <label class="form-label" for="usuario">Usuário</label>
+        <input id="usuario" name="usuario" class="form-control mb-2" autocomplete="username" required />
+        <label class="form-label" for="senha">Senha</label>
+        <input id="senha" name="senha" type="password" class="form-control mb-3" autocomplete="current-password" required />
+        <button class="btn btn-primary w-100">Entrar</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public int? Erro { get; set; }
+}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="bootstrap.min.css" />
+    <link rel="stylesheet" href="app.css" />
+    <HeadOutlet @rendermode="ModoPagina" />
+</head>
+<body>
+    <Routes @rendermode="ModoPagina" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    // A tela de login é estática (grava o cookie); o restante do painel é interativo.
+    private IComponentRenderMode? ModoPagina => HttpContext.Request.Path.StartsWithSegments("/entrar")
+        ? null
+        : new InteractiveServerRenderMode(prerender: false);
+}

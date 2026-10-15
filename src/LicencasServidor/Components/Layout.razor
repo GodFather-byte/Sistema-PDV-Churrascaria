@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+
+<nav class="navbar navbar-expand navbar-dark bg-dark px-3 mb-4">
+    <span class="navbar-brand">Licenças PDV</span>
+    <AuthorizeView>
+        <Authorized>
+            <div class="navbar-nav me-auto">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Licenças</NavLink>
+                <NavLink class="nav-link" href="conferir">Conferir arquivo</NavLink>
+                <NavLink class="nav-link" href="equipe">Equipe</NavLink>
+            </div>
+            <form method="post" action="conta/sair" class="d-flex align-items-center gap-2">
+                <span class="text-light small">@context.User.Identity?.Name</span>
+                <button class="btn btn-sm btn-outline-light">Sair</button>
+            </form>
+        </Authorized>
+    </AuthorizeView>
+</nav>
+<main class="container-fluid px-4 pb-5">
+    @Body
+</main>

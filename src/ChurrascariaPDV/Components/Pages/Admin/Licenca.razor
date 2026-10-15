@@ -1,5 +1,6 @@
 @page "/admin/licenca"
 @inject LicencaService Licencas
+@inject VerificacaoOnlineService Online
 
 <PageTitle>Licença</PageTitle>
 
@@ -23,6 +24,17 @@
             <input class="form-control mb-2 codigo-maquina" readonly value="@s.CodigoMaquina" onclick="this.select()" />
         </div>
 
+        <div class="painel mb-3">
+            <p class="mb-2">
+                Conferência online: @(Online.UltimoSucesso is { } ok ? $"última em {ok:dd/MM/yyyy HH:mm}" : "ainda não conferida")
+                @if (Online.UltimoResultado is { } resultado)
+                {
+                    <br /><span class="text-muted">@resultado</span>
+                }
+            </p>
+            <button class="btn btn-secondary" disabled="@_conferindo" @onclick="ConferirOnlineAsync">Conferir agora</button>
+        </div>
+
         <div class="painel">
             <label class="form-label" for="arquivo-licenca">Instalar arquivo de licença (.pdv)</label>
             <InputFile id="arquivo-licenca" class="form-control" accept=".pdv" OnChange="InstalarAsync" />
@@ -36,10 +48,19 @@
 
 @code {
     private SituacaoLicenca? _situacao;
+    private bool _conferindo;
     private string? _aviso;
     private string _tipoAviso = "info";
 
     private async Task CarregarAsync() => _situacao = await Licencas.ObterSituacaoAsync();
+
+    private async Task ConferirOnlineAsync()
+    {
+        _conferindo = true;
+        await Online.VerificarAgoraAsync();
+        _situacao = await Licencas.ObterSituacaoAsync();
+        _conferindo = false;
+    }
 
     private async Task InstalarAsync(InputFileChangeEventArgs e)
     {

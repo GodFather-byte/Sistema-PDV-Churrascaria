@@ -1,0 +1,57 @@
+@page "/conferir"
+@inject LicencasService Servico
+
+<PageTitle>Conferir arquivo · Licenças PDV</PageTitle>
+
+<h1 class="h3 mb-3">Conferir arquivo de licença</h1>
+<p class="text-muted">Abra um arquivo .pdv recebido de um cliente para ver se ele é autêntico e a quem pertence.</p>
+
+<InputFile class="form-control mb-3" style="max-width: 480px" accept=".pdv" OnChange="ConferirAsync" />
+
+@if (_erro is not null)
+{
+    <div class="alert alert-danger">@_erro</div>
+}
+@if (_licenca is { } l)
+{
+    <div class="alert alert-success">Assinatura válida.</div>
+    <dl class="row">
+        <dt class="col-sm-3">Licença</dt><dd class="col-sm-9 font-monospace">@l.Id</dd>
+        <dt class="col-sm-3">Cliente</dt><dd class="col-sm-9">@l.Cliente</dd>
+        <dt class="col-sm-3">Máquina</dt><dd class="col-sm-9 font-monospace">@l.Maquina</dd>
+        <dt class="col-sm-3">Válida até (no arquivo)</dt><dd class="col-sm-9">@l.ValidaAte.ToString("dd/MM/yyyy")</dd>
+    </dl>
+    @if (_registro is { } r)
+    {
+        var (texto, cor) = Licencas.Situacao(r);
+        <p>No painel: <span class="badge bg-@cor">@texto</span>, válida até @r.ValidaAte.ToString("dd/MM/yyyy").
+            <a href="licenca/@r.Id">Abrir cadastro</a></p>
+    }
+    else
+    {
+        <p class="text-warning">Esta licença não está cadastrada no painel.</p>
+    }
+}
+
+@code {
+    private Licenca? _licenca;
+    private LicencaCliente? _registro;
+    private string? _erro;
+
+    private async Task ConferirAsync(InputFileChangeEventArgs e)
+    {
+        (_licenca, _registro, _erro) = (null, null, null);
+        try
+        {
+            using var leitor = new StreamReader(e.File.OpenReadStream(maxAllowedSize: 16 * 1024));
+            using var chave = FormatoLicenca.CarregarChave(ChavesLicenca.Publica);
+            _licenca = FormatoLicenca.Ler<Licenca>(await leitor.ReadToEndAsync(), chave);
+            if (_licenca is null) _erro = "Arquivo inválido: a assinatura não confere (arquivo alterado ou não emitido por vocês).";
+            else _registro = await Servico.ObterAsync(_licenca.Id);
+        }
+        catch (IOException ex)
+        {
+            _erro = ex.Message;
+        }
+    }
+}

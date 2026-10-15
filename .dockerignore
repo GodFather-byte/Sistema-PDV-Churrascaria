@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+**/dados/
+**/*.db
+**/*.pem
+**/*.pdv
+.git/
+.vs/
+.vscode/

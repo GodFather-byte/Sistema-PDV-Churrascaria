@@ -1,0 +1,57 @@
+@page "/admin/licenca"
+@inject LicencaService Licencas
+
+<PageTitle>Licença</PageTitle>
+
+<AreaProtegida Area="gerencia" Titulo="Licença (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => CarregarAsync()">
+    <h1 class="mb-3">Licença</h1>
+    <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+    @if (_situacao is { } s)
+    {
+        <div class="painel mb-3">
+            <p class="mb-2"><strong>@AvisoLicenca.Texto(s)</strong></p>
+            @if (s.Licenca is { } licenca)
+            {
+                <p class="mb-2">Cliente: @licenca.Cliente · Licença @licenca.Id · emitida em @licenca.EmitidaEm.ToString("dd/MM/yyyy") · válida até @licenca.ValidaAte.ToString("dd/MM/yyyy")</p>
+            }
+            @if (s.Problema is not null)
+            {
+                <p class="text-warning mb-2">@s.Problema</p>
+            }
+            <label class="form-label">Código deste computador (envie ao fornecedor para emitir ou renovar a licença)</label>
+            <input class="form-control mb-2 codigo-maquina" readonly value="@s.CodigoMaquina" onclick="this.select()" />
+        </div>
+
+        <div class="painel">
+            <label class="form-label" for="arquivo-licenca">Instalar arquivo de licença (.pdv)</label>
+            <InputFile id="arquivo-licenca" class="form-control" accept=".pdv" OnChange="InstalarAsync" />
+            <p class="text-muted mt-2 mb-0">
+                Sem licença válida, o sistema fica somente leitura: não abre turno nem lança pedidos,
+                mas continua recebendo contas abertas, fechando o caixa e mostrando relatórios.
+            </p>
+        </div>
+    }
+</AreaProtegida>
+
+@code {
+    private SituacaoLicenca? _situacao;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private async Task CarregarAsync() => _situacao = await Licencas.ObterSituacaoAsync();
+
+    private async Task InstalarAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            using var leitor = new StreamReader(e.File.OpenReadStream(maxAllowedSize: 16 * 1024));
+            _situacao = await Licencas.InstalarAsync(await leitor.ReadToEndAsync());
+            (_aviso, _tipoAviso) = ("Licença instalada.", "sucesso");
+        }
+        catch (Exception ex) when (ex is RegraNegocioException or IOException)
+        {
+            (_aviso, _tipoAviso) = (ex.Message, "erro");
+        }
+    }
+}

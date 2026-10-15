@@ -104,6 +104,36 @@ Copie a pasta `publicacao` para o PC do caixa junto com os arquivos de `scripts/
 em tela cheia. Também é possível executar `ChurrascariaPDV.exe` diretamente. Para abrir o caixa em tela cheia,
 use o navegador em modo quiosque, por exemplo: `msedge --kiosk http://localhost:5000/caixa --edge-kiosk-type=fullscreen`.
 
+## Licença (assinatura)
+
+Cada instalação precisa de um arquivo de licença (`licenca.pdv`) emitido para o PC do caixa, com data de validade.
+O arquivo é assinado digitalmente (ECDSA P-256) e conferido sem internet; editar o arquivo ou copiá-lo para outro PC invalida a licença.
+
+- **Teste:** sem licença, o sistema funciona por 15 dias a partir da abertura do primeiro turno.
+- **Vencimento:** aviso nos 7 dias anteriores; depois, 5 dias de carência; por fim, **somente leitura**:
+  não abre turno nem lança pedidos, mas recebe contas abertas, fecha o caixa, mostra relatórios e mantém os backups.
+- Atrasar o relógio do Windows não prolonga a licença (vale a data mais recente registrada nas vendas).
+- O gerente vê o **código do computador** e instala o arquivo em **Gerência > Licença** (`/admin/licenca`).
+
+### Emitir licenças (fornecedor)
+
+A ferramenta `tools/GeradorLicenca` não vai no instalador. A chave privada fica **fora do repositório**
+(ex.: `C:\Users\<você>\Documents\PDV-Licencas\chave-privada.pem`); guarde cópias dela em local seguro,
+pois sem ela não é possível emitir nem renovar licenças. A chave pública correspondente está em `LicencaService`.
+
+```powershell
+# Emitir/renovar: código do PC informado pelo cliente, nome do cliente e validade
+dotnet run --project tools/GeradorLicenca -- emitir C:\caminho\chave-privada.pem ABCD-EFGH-JKLM-NPQR "Pizzaria do João" 2026-12-31
+# Conferir um arquivo de licença
+dotnet run --project tools/GeradorLicenca -- verificar licenca-PizzariadoJoao-20261231.pdv
+```
+
+Envie o `.pdv` ao cliente; ele instala em **Gerência > Licença**. Para renovar, emita um novo arquivo com a nova data.
+Se o cliente trocar de computador, o código muda e é preciso emitir uma licença nova.
+
+> Como o código-fonte é público, a licença impede o uso casual sem pagamento, mas quem compilar o código
+> pode remover a verificação. Para proteção mais forte, mantenha o repositório privado.
+
 ## Primeiro acesso e perfis de exemplo
 
 Instalações novas **não têm usuários ou PINs padrão**. Use o assistente de instalação para criar o gerente

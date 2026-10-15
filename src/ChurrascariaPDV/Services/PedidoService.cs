@@ -2,6 +2,7 @@ using ChurrascariaPDV.Domain.Entities;
 using ChurrascariaPDV.Domain.Enums;
 using ChurrascariaPDV.Infrastructure.Data;
 using ChurrascariaPDV.Services.Impressao;
+using ChurrascariaPDV.Services.Licenciamento;
 using ChurrascariaPDV.Services.Notificacoes;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,7 +21,8 @@ public class PedidoService(
     IDbContextFactory<AppDbContext> dbFactory,
     ImpressaoService impressao,
     NotificadorMesas notificador,
-    ProtecaoPin? protecao = null)
+    ProtecaoPin? protecao = null,
+    LicencaService? licenca = null)
 {
     private const decimal QuantidadeMaxima = 999;
 
@@ -30,6 +32,7 @@ public class PedidoService(
     /// </summary>
     public async Task<ResultadoPedido> LancarPedidoAsync(NovoPedido novo)
     {
+        if (licenca is not null) await licenca.GarantirPodeVenderAsync();
         if (novo.Itens.Count == 0)
         {
             throw new RegraNegocioException("Adicione ao menos um item ao pedido.");

@@ -10,3 +10,5 @@
 *.instalacao-pendente
 publicacao/
 saida/
+*.pdv
+*.pem

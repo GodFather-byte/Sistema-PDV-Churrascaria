@@ -901,3 +901,10 @@ main {
 .components-reconnect-show, .components-reconnect-failed, .components-reconnect-rejected { z-index: 4000; }
 
 .garcom .pdv-aviso { top: 4.2rem; }
+
+/* Faixa de licença: fixa no topo para não deslocar as telas de tela cheia. */
+.faixa-licenca { position: fixed; top: 0; left: 0; right: 0; z-index: 1050; padding: 2px 12px; text-align: center; font-size: .85rem; }
+.faixa-licenca a { color: inherit; font-weight: 600; margin-left: 6px; }
+.faixa-licenca-aviso { background: #6b4e00; color: #fff3c4; }
+.faixa-licenca-bloqueio { background: #5c1a1b; color: #ffe1e1; }
+.codigo-maquina { font-family: monospace; font-size: 1.2rem; letter-spacing: 2px; max-width: 320px; }

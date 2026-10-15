@@ -2,6 +2,7 @@ using ChurrascariaPDV.Domain.Entities;
 using ChurrascariaPDV.Domain.Enums;
 using ChurrascariaPDV.Infrastructure.Data;
 using ChurrascariaPDV.Services.Impressao;
+using ChurrascariaPDV.Services.Licenciamento;
 using ChurrascariaPDV.Services.Notificacoes;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,7 +36,8 @@ public record IndicadoresCaixa(int MesasOcupadas, int ContasSolicitadas, int Tot
 public class CaixaService(
     IDbContextFactory<AppDbContext> dbFactory,
     ImpressaoService impressao,
-    NotificadorMesas notificador)
+    NotificadorMesas notificador,
+    LicencaService? licenca = null)
 {
     public async Task<TurnoCaixa?> ObterTurnoAbertoAsync()
     {
@@ -68,6 +70,7 @@ public class CaixaService(
 
     public async Task AbrirTurnoAsync(decimal fundoTroco, int usuarioId)
     {
+        if (licenca is not null) await licenca.GarantirPodeVenderAsync();
         if (fundoTroco < 0)
         {
             throw new RegraNegocioException("O fundo de troco não pode ser negativo.");

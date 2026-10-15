@@ -1,0 +1,37 @@
+@implements IDisposable
+@inject LicencaService Licencas
+
+@if (_situacao is { ExibirAviso: true } s)
+{
+    <div class="faixa-licenca faixa-licenca-@(s.PermiteVender ? "aviso" : "bloqueio")" role="status">
+        @Texto(s) <a href="admin/licenca">Licença</a>
+    </div>
+}
+
+@code {
+    private SituacaoLicenca? _situacao;
+    private Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _situacao = await Licencas.ObterSituacaoAsync();
+        _timer = new Timer(_ => InvokeAsync(async () =>
+        {
+            _situacao = await Licencas.ObterSituacaoAsync();
+            StateHasChanged();
+        }), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
+    }
+
+    public static string Texto(SituacaoLicenca s) => s.Estado switch
+    {
+        EstadoLicenca.Ativa => $"Licença ativa até {s.Licenca!.ValidaAte:dd/MM/yyyy}.",
+        EstadoLicenca.VenceEmBreve => s.Dias == 0 ? "A licença vence hoje. Renove a assinatura." : $"A licença vence em {s.Dias} dia(s). Renove a assinatura.",
+        EstadoLicenca.Carencia => $"Licença vencida. Em {s.Dias} dia(s) o sistema fica somente leitura. Renove a assinatura.",
+        EstadoLicenca.Vencida => "Licença vencida: sistema somente leitura (sem novos turnos e pedidos).",
+        EstadoLicenca.Bloqueada => "Licença bloqueada pelo fornecedor: sistema somente leitura (sem novos turnos e pedidos).",
+        EstadoLicenca.Teste => $"Período de teste: {s.Dias} dia(s) restante(s).",
+        _ => "Período de teste encerrado: sistema somente leitura (sem novos turnos e pedidos)."
+    };
+
+    public void Dispose() => _timer?.Dispose();
+}

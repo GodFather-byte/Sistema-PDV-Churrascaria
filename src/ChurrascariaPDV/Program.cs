@@ -2,6 +2,7 @@ using ChurrascariaPDV.Components;
 using ChurrascariaPDV.Infrastructure.Data;
 using ChurrascariaPDV.Services;
 using ChurrascariaPDV.Services.Impressao;
+using ChurrascariaPDV.Services.Licenciamento;
 using ChurrascariaPDV.Services.Notificacoes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -29,6 +30,8 @@ builder.Services.AddSingleton<RedeLocalService>();
 builder.Services.AddSingleton<LimiteTentativasPin>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ProtecaoPin>();
+builder.Services.AddSingleton(sp => new LicencaService(sp.GetRequiredService<IConfiguration>(),
+    sp.GetRequiredService<IDbContextFactory<AppDbContext>>()));
 builder.Services.AddHostedService<BackupBancoService>();
 
 builder.Services.AddScoped<UsuarioService>();

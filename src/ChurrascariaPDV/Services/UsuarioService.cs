@@ -12,7 +12,7 @@ public record UsuarioLogado(int Id, string Nome, PerfilUsuario Perfil, bool Troc
     public bool Gerente => !TrocaPinObrigatoria && Perfil == PerfilUsuario.Gerente;
 }
 
-public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
+public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory, ProtecaoPin? protecao = null)
 {
     private static readonly PasswordHasher<Usuario> Hasher = new();
 
@@ -29,9 +29,11 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
             return null;
         }
 
+        protecao?.GarantirLiberado();
         await using var db = await dbFactory.CreateDbContextAsync();
         var usuario = (await db.Usuarios.AsNoTracking().Where(u => u.Ativo).ToListAsync())
             .FirstOrDefault(u => ConferePin(u, pin));
+        RegistrarTentativa(protecao, usuario is not null);
         return usuario is null ? null : new UsuarioLogado(usuario.Id, usuario.Nome, usuario.Perfil, usuario.TrocaPinObrigatoria);
     }
 
@@ -43,14 +45,16 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
     }
 
     /// <summary>Valida o PIN de um gerente ativo, exigido para cancelamentos e estornos.</summary>
-    public static async Task<Usuario> ValidarGerenteAsync(AppDbContext db, string? pinGerente)
+    public static async Task<Usuario> ValidarGerenteAsync(AppDbContext db, string? pinGerente, ProtecaoPin? protecao = null)
     {
         if (string.IsNullOrWhiteSpace(pinGerente))
         {
             throw new RegraNegocioException("Informe o PIN do gerente.");
         }
 
+        protecao?.GarantirLiberado();
         var gerente = (await db.Usuarios.Where(u => u.Ativo).ToListAsync()).FirstOrDefault(u => ConferePin(u, pinGerente));
+        RegistrarTentativa(protecao, gerente?.Perfil == PerfilUsuario.Gerente);
         if (gerente is null || gerente.Perfil != PerfilUsuario.Gerente)
         {
             throw new RegraNegocioException("PIN de gerente inválido.");
@@ -61,6 +65,12 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
         }
 
         return gerente;
+    }
+
+    private static void RegistrarTentativa(ProtecaoPin? protecao, bool sucesso)
+    {
+        if (sucesso) protecao?.RegistrarSucesso();
+        else protecao?.RegistrarFalha();
     }
 
     public async Task<List<Usuario>> ListarAsync()
@@ -119,10 +129,13 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
     {
         if (!PinValido(novoPin) || novoPin != confirmacao || novoPin == pinAtual)
             throw new RegraNegocioException("Informe e confirme um novo PIN de 4 dígitos, diferente do atual.");
+        protecao?.GarantirLiberado();
         await using var db = await dbFactory.CreateDbContextAsync();
         await using var transacao = await db.Database.BeginTransactionAsync();
         var usuario = await db.Usuarios.SingleOrDefaultAsync(u => u.Id == id && u.Ativo);
-        if (usuario is null || !ConferePin(usuario, pinAtual))
+        var pinConfere = usuario is not null && ConferePin(usuario, pinAtual);
+        RegistrarTentativa(protecao, pinConfere);
+        if (usuario is null || !pinConfere)
             throw new RegraNegocioException("PIN atual inválido.");
         if ((await db.Usuarios.Where(u => u.Id != id).ToListAsync()).Any(u => ConferePin(u, novoPin)))
             throw new RegraNegocioException("Já existe um usuário com esse PIN.");

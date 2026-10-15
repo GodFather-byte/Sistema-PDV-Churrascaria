@@ -89,8 +89,20 @@ else
     {
         _verificando = true;
         _erro = null;
-        var usuario = await Usuarios.AutenticarAsync(pin);
-        _verificando = false;
+        UsuarioLogado? usuario;
+        try
+        {
+            usuario = await Usuarios.AutenticarAsync(pin);
+        }
+        catch (RegraNegocioException ex)
+        {
+            _erro = ex.Message;
+            return;
+        }
+        finally
+        {
+            _verificando = false;
+        }
         if (usuario is null)
         {
             _erro = "PIN inválido";

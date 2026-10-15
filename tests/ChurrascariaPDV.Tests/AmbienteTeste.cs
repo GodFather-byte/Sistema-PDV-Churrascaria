@@ -52,6 +52,7 @@ public sealed class AmbienteTeste : IAsyncDisposable
         services.AddSingleton<NotificadorMesas>();
         services.AddScoped<UsuarioService>();
         services.AddScoped<CardapioService>();
+        services.AddScoped<EstoqueService>();
         services.AddScoped<MesaService>();
         services.AddScoped<PedidoService>();
         services.AddScoped<PagamentoService>();
@@ -73,6 +74,7 @@ public sealed class AmbienteTeste : IAsyncDisposable
     public PedidoService Pedidos => Servico<PedidoService>();
     public PagamentoService Pagamentos => Servico<PagamentoService>();
     public CaixaService Caixa_ => Servico<CaixaService>();
+    public EstoqueService Estoque => Servico<EstoqueService>();
     public HistoricoImpressoes Impressoes => Servico<HistoricoImpressoes>();
 
     public AppDbContext NovoContexto() => _scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContext();

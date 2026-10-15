@@ -18,7 +18,7 @@
     <div class="painel mb-3">
         <h2>Produtos</h2>
         <table class="table table-dark table-hover table-sm align-middle">
-            <thead><tr><th>Produto</th><th>Categoria</th><th>Tipo</th><th>Setor de impressão</th><th>Opções</th><th class="text-end">Preço</th><th>Ativo</th><th></th></tr></thead>
+            <thead><tr><th>Produto</th><th>Categoria</th><th>Tipo</th><th>Setor de impressão</th><th>Opções</th><th class="text-end">Preço</th><th>Estoque</th><th>Ativo</th><th></th></tr></thead>
             <tbody>
                 @foreach (var produto in _produtos)
                 {
@@ -29,6 +29,7 @@
                         <td>@Formato.Setor(produto.SetorImpressao)</td>
                         <td>@string.Join(", ", produto.GruposModificadores.Select(g => _grupos.FirstOrDefault(x => x.Id == g.GrupoModificadorId)?.Nome))</td>
                         <td class="text-end">@Formato.Moeda(produto.Preco)</td>
+                        <td>@(produto.ControlaEstoque ? Formato.Qtd(produto.QuantidadeEstoque) : "—")</td>
                         <td>@(produto.Ativo ? "Sim" : "Não")</td>
                         <td class="text-end"><button type="button" class="btn btn-sm btn-outline-light" @onclick="() => EditarProduto(produto)">Editar</button></td>
                     </tr>
@@ -124,6 +125,11 @@
                     <input id="produto-ativo" class="form-check-input" type="checkbox" @bind="_produto.Ativo" />
                     <label class="form-check-label" for="produto-ativo">Ativo (aparece no cardápio)</label>
                 </div>
+                <div class="form-check">
+                    <input id="produto-controla-estoque" class="form-check-input" type="checkbox" @bind="_produto.ControlaEstoque" />
+                    <label class="form-check-label" for="produto-controla-estoque">Controlar estoque deste produto</label>
+                    <small class="d-block text-muted">A baixa ocorre quando a comanda for quitada. Ajuste o saldo na tela Estoque.</small>
+                </div>
             }
         </ChildContent>
         <Rodape>
@@ -195,7 +201,7 @@
     {
         _produto = produto is null
             ? new Produto { CategoriaId = _categorias.FirstOrDefault()?.Id ?? 0, TipoItem = TipoItem.PorcaoCozinha, SetorImpressao = SetorImpressao.Cozinha, Ativo = true }
-            : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressao = produto.SetorImpressao, Ativo = produto.Ativo };
+            : new Produto { Id = produto.Id, Nome = produto.Nome, Preco = produto.Preco, CategoriaId = produto.CategoriaId, TipoItem = produto.TipoItem, SetorImpressao = produto.SetorImpressao, Ativo = produto.Ativo, ControlaEstoque = produto.ControlaEstoque, QuantidadeEstoque = produto.QuantidadeEstoque };
         _precoProduto = Formato.ValorEditavel(_produto.Preco);
         _gruposProduto = produto?.GruposModificadores.Select(g => g.GrupoModificadorId).ToHashSet() ?? [];
     }

@@ -10,4 +10,5 @@ public class Usuario
     public PerfilUsuario Perfil { get; set; }
     public bool Ativo { get; set; } = true;
     public ICollection<Pedido> Pedidos { get; set; } = new List<Pedido>();
+    public ICollection<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = new List<MovimentacaoEstoque>();
 }

@@ -26,6 +26,7 @@ builder.Services.AddSingleton<RedeLocalService>();
 
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<CardapioService>();
+builder.Services.AddScoped<EstoqueService>();
 builder.Services.AddScoped<MesaService>();
 builder.Services.AddScoped<PedidoService>();
 builder.Services.AddScoped<PagamentoService>();

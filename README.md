@@ -6,6 +6,7 @@ Os garçons lançam pedidos pelo celular conectado ao Wi-Fi do restaurante, sem 
 - **Caixa** (`/caixa`): tela desktop widescreen com mapa de mesas em tempo real, recebimento e atalhos F1–F12.
 - **Garçom** (`/garcom`): tela mobile touch-first com login por PIN, mapa de mesas, lançamento rápido e pré-conta.
 - **Impressão por setor**: tickets ESC/POS via TCP 9100 para Bar/Copa, Cozinha, Churrasqueira e Caixa, com modo simulação.
+- **Estoque** (`/admin/estoque`): entradas, perdas e histórico; baixa automática dos produtos controlados ao quitar a comanda.
 
 ## Executar
 
@@ -91,6 +92,9 @@ Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em prod
 - **Taxa de serviço** de 10% opcional por comanda; fica registrada em cada pagamento para o relatório.
 - **Estorno de pagamento** com PIN de gerente, enquanto a conta e o turno estiverem abertos.
 - Novo item depois da pré-conta devolve a mesa para *Ocupada*.
+- **Estoque de produtos prontos**: ative o controle no cadastro do produto e lance entradas/saídas em Estoque.
+  A venda baixa a quantidade quando a comanda é quitada; itens cancelados são registrados como perda.
+  O saldo pode ficar negativo e aparece sinalizado para conferência. Produtos sem controle de estoque não são afetados.
 
 ## Impressoras
 
@@ -131,7 +135,7 @@ ChurrascariaPDV.sln
 │   ├── Domain/                # Entidades e enums
 │   ├── Infrastructure/Data/   # AppDbContext, seed, migrations, preparação do banco
 │   ├── Services/              # MesaService, PedidoService, PagamentoService, CaixaService,
-│   │   │                      # CardapioService, UsuarioService, RelatorioService, RedeLocalService
+│   │   │                      # CardapioService, EstoqueService, UsuarioService, RelatorioService
 │   │   ├── Impressao/         # Documento ESC/POS, layouts dos tickets, envio TCP 9100
 │   │   └── Notificacoes/      # Notificador de mesas + hub SignalR
 │   └── wwwroot/               # app.css (tema), js/pdv.js (atalhos), bootstrap

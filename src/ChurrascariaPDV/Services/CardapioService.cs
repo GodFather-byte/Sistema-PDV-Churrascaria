@@ -135,6 +135,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         produto.TipoItem = dados.TipoItem;
         produto.SetorImpressao = dados.TipoItem == TipoItem.Rodizio ? SetorImpressao.Nenhum : dados.SetorImpressao;
         produto.Ativo = dados.Ativo;
+        produto.ControlaEstoque = dados.ControlaEstoque;
 
         produto.GruposModificadores.Clear();
         foreach (var grupoId in gruposModificadores.Distinct())

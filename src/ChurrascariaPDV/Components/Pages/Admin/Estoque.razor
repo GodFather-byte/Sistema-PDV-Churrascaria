@@ -1,0 +1,159 @@
+@page "/admin/estoque"
+@inherits ComponenteTempoReal
+@inject EstoqueService EstoqueService
+
+<PageTitle>Estoque</PageTitle>
+
+<AreaProtegida Area="gerencia" Titulo="Estoque (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => CarregarAsync()">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Estoque de produtos</h1>
+        <a class="btn btn-outline-light" href="admin/produtos">Configurar produtos</a>
+    </div>
+
+    <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+    <div class="relatorio-grade">
+        <div class="painel">
+            <h2>Saldo atual</h2>
+            @if (_produtos.Count == 0)
+            {
+                <p class="text-muted mb-0">Nenhum produto controla estoque. Ative essa opção no cadastro do cardápio.</p>
+            }
+            else
+            {
+                <table class="table table-dark table-sm align-middle">
+                    <thead><tr><th>Produto</th><th class="text-end">Quantidade</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @foreach (var produto in _produtos)
+                        {
+                            <tr>
+                                <td>@produto.Nome</td>
+                                <td class="text-end">@Formato.Qtd(produto.QuantidadeEstoque)</td>
+                                <td>
+                                    @if (produto.QuantidadeEstoque < 0)
+                                    {
+                                        <span class="text-danger">Estoque negativo</span>
+                                    }
+                                    else if (produto.QuantidadeEstoque == 0)
+                                    {
+                                        <span class="text-warning">Sem saldo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-success">Disponível</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <div class="painel">
+            <h2>Registrar movimentação</h2>
+            @if (_produtos.Count > 0)
+            {
+                <label class="form-label" for="estoque-produto">Produto</label>
+                <select id="estoque-produto" class="form-select mb-3" @bind="_produtoId">
+                    <option value="0">Selecione um produto</option>
+                    @foreach (var produto in _produtos)
+                    {
+                        <option value="@produto.Id">@produto.Nome (@Formato.Qtd(produto.QuantidadeEstoque))</option>
+                    }
+                </select>
+                <div class="btn-group w-100 mb-3" role="group" aria-label="Tipo de movimentação">
+                    <button type="button" class="btn @(_entrada ? "btn-brasa" : "btn-outline-light")" @onclick="() => _entrada = true">Entrada</button>
+                    <button type="button" class="btn @(!_entrada ? "btn-brasa" : "btn-outline-light")" @onclick="() => _entrada = false">Saída / perda</button>
+                </div>
+                <label class="form-label" for="estoque-quantidade">Quantidade</label>
+                <input id="estoque-quantidade" class="form-control mb-3" inputmode="decimal" @bind="_quantidade" placeholder="Ex.: 12 ou 0,5" />
+                <label class="form-label" for="estoque-motivo">Motivo</label>
+                <input id="estoque-motivo" class="form-control mb-3" maxlength="250" @bind="_observacao" placeholder="Ex.: compra recebida, perda ou inventário" />
+                <button type="button" class="btn btn-brasa w-100" disabled="@(_produtoId == 0)" @onclick="() => RegistrarAsync(context)">Registrar movimentação</button>
+                <p class="small text-muted mt-2 mb-0">A quitação da comanda baixa automaticamente os itens vendidos. Saldo negativo é permitido e sinalizado.</p>
+            }
+        </div>
+    </div>
+
+    <div class="painel mt-3">
+        <h2>Últimas movimentações</h2>
+        <div class="table-responsive">
+            <table class="table table-dark table-sm align-middle">
+                <thead><tr><th>Data</th><th>Produto</th><th>Tipo</th><th class="text-end">Variação</th><th class="text-end">Saldo</th><th>Motivo / referência</th><th>Responsável</th></tr></thead>
+                <tbody>
+                    @foreach (var movimento in _movimentacoes)
+                    {
+                        <tr>
+                            <td>@Formato.DataHora(movimento.DataHora)</td>
+                            <td>@movimento.Produto</td>
+                            <td>@(movimento.Tipo switch
+                            {
+                                TipoMovimentacaoEstoque.Entrada => "Entrada",
+                                TipoMovimentacaoEstoque.Perda => "Saída / perda",
+                                TipoMovimentacaoEstoque.Venda => "Venda",
+                                _ => movimento.Tipo.ToString()
+                            })</td>
+                            <td class="text-end @(movimento.Quantidade < 0 ? "text-danger" : "text-success")">@Formato.Qtd(movimento.Quantidade)</td>
+                            <td class="text-end">@Formato.Qtd(movimento.SaldoApos)</td>
+                            <td>@movimento.Observacao</td>
+                            <td>@(movimento.Usuario ?? "Sistema")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (_movimentacoes.Count == 0)
+        {
+            <p class="text-muted mb-0">Ainda não há movimentações.</p>
+        }
+    </div>
+</AreaProtegida>
+
+@code {
+    private List<ProdutoEstoque> _produtos = [];
+    private List<MovimentoEstoqueResumo> _movimentacoes = [];
+    private int _produtoId;
+    private bool _entrada = true;
+    private string? _quantidade;
+    private string? _observacao;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private async Task CarregarAsync()
+    {
+        _produtos = await EstoqueService.ListarProdutosAsync();
+        _movimentacoes = await EstoqueService.ListarMovimentacoesAsync();
+        if (!_produtos.Any(produto => produto.Id == _produtoId))
+        {
+            _produtoId = _produtos.FirstOrDefault()?.Id ?? 0;
+        }
+    }
+
+    protected override Task AoAlterarMesasAsync(int? mesaId) => CarregarAsync();
+
+    private async Task RegistrarAsync(UsuarioLogado usuario)
+    {
+        if (!Formato.TentarLerValor(_quantidade, out var quantidade))
+        {
+            _aviso = "Quantidade inválida.";
+            _tipoAviso = "erro";
+            return;
+        }
+
+        try
+        {
+            await EstoqueService.AjustarAsync(_produtoId, quantidade, _entrada, _observacao, usuario.Id);
+            _quantidade = null;
+            _observacao = null;
+            await CarregarAsync();
+            _aviso = "Movimentação registrada.";
+            _tipoAviso = "sucesso";
+        }
+        catch (RegraNegocioException ex)
+        {
+            _aviso = ex.Message;
+            _tipoAviso = "erro";
+        }
+    }
+}

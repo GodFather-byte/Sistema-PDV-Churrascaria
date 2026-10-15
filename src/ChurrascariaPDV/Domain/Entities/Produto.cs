@@ -11,7 +11,10 @@ public class Produto
     public TipoItem TipoItem { get; set; }
     public SetorImpressao SetorImpressao { get; set; }
     public bool Ativo { get; set; } = true;
+    public bool ControlaEstoque { get; set; }
+    public decimal QuantidadeEstoque { get; set; }
     public CategoriaProduto Categoria { get; set; } = null!;
     public ICollection<ItemPedido> ItensPedido { get; set; } = new List<ItemPedido>();
     public ICollection<GrupoModificadorProduto> GruposModificadores { get; set; } = new List<GrupoModificadorProduto>();
+    public ICollection<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = new List<MovimentacaoEstoque>();
 }

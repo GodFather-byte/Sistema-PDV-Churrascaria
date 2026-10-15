@@ -184,6 +184,7 @@ public class PedidoService(
         }
 
         ContaMesa.GarantirSaldoNaoNegativo(comanda);
+        EstoqueService.RegistrarPerdaPorCancelamento(db, cancelado, gerente.Id, cancelado.MotivoCancelamento);
         await ContaMesa.AtualizarValorAsync(db, pedido.Mesa);
         await transacao.CommitAsync();
 

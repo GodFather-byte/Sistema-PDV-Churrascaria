@@ -18,6 +18,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<FechamentoConta> FechamentosConta => Set<FechamentoConta>();
     public DbSet<TurnoCaixa> TurnosCaixa => Set<TurnoCaixa>();
     public DbSet<MovimentacaoCaixa> MovimentacoesCaixa => Set<MovimentacaoCaixa>();
+    public DbSet<MovimentacaoEstoque> MovimentacoesEstoque => Set<MovimentacaoEstoque>();
     public DbSet<Usuario> Usuarios => Set<Usuario>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -51,6 +52,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Produto>(entity =>
         {
             entity.Property(produto => produto.Preco).HasPrecision(10, 2);
+            entity.Property(produto => produto.QuantidadeEstoque).HasPrecision(10, 3);
             entity.Property(produto => produto.TipoItem).HasConversion<string>();
             entity.Property(produto => produto.SetorImpressao).HasConversion<string>();
             entity.HasOne(produto => produto.Categoria)
@@ -195,6 +197,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<MovimentacaoEstoque>(entity =>
+        {
+            entity.Property(movimentacao => movimentacao.Tipo).HasConversion<string>();
+            entity.Property(movimentacao => movimentacao.Quantidade).HasPrecision(10, 3);
+            entity.Property(movimentacao => movimentacao.SaldoApos).HasPrecision(10, 3);
+            entity.Property(movimentacao => movimentacao.Observacao).HasMaxLength(250);
+            entity.HasIndex(movimentacao => movimentacao.DataHora);
+            entity.HasIndex(movimentacao => movimentacao.ItemPedidoId).IsUnique();
+            entity.HasOne(movimentacao => movimentacao.Produto)
+                .WithMany(produto => produto.MovimentacoesEstoque)
+                .HasForeignKey(movimentacao => movimentacao.ProdutoId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(movimentacao => movimentacao.ItemPedido)
+                .WithMany()
+                .HasForeignKey(movimentacao => movimentacao.ItemPedidoId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(movimentacao => movimentacao.Usuario)
+                .WithMany(usuario => usuario.MovimentacoesEstoque)
+                .HasForeignKey(movimentacao => movimentacao.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<Usuario>(entity =>
         {
             entity.Property(usuario => usuario.Nome).HasMaxLength(100).IsRequired();
@@ -233,16 +257,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             new CategoriaProduto { Id = 5, Nome = "Sobremesas" });
 
         modelBuilder.Entity<Produto>().HasData(
-            new { Id = 1, Nome = "Rodízio Completo Adulto", Preco = 89.90m, CategoriaId = 1, TipoItem = Domain.Enums.TipoItem.Rodizio, SetorImpressao = Domain.Enums.SetorImpressao.Nenhum, Ativo = true },
-            new { Id = 2, Nome = "Rodízio Infantil", Preco = 44.90m, CategoriaId = 1, TipoItem = Domain.Enums.TipoItem.Rodizio, SetorImpressao = Domain.Enums.SetorImpressao.Nenhum, Ativo = true },
-            new { Id = 3, Nome = "Picanha na Tábua", Preco = 119.90m, CategoriaId = 2, TipoItem = Domain.Enums.TipoItem.CarneAlaCarte, SetorImpressao = Domain.Enums.SetorImpressao.Churrasqueira, Ativo = true },
-            new { Id = 4, Nome = "Costela no Bafo", Preco = 99.90m, CategoriaId = 2, TipoItem = Domain.Enums.TipoItem.CarneAlaCarte, SetorImpressao = Domain.Enums.SetorImpressao.Churrasqueira, Ativo = true },
-            new { Id = 5, Nome = "Polenta Frita", Preco = 32.90m, CategoriaId = 3, TipoItem = Domain.Enums.TipoItem.PorcaoCozinha, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true },
-            new { Id = 6, Nome = "Mandioca Frita", Preco = 34.90m, CategoriaId = 3, TipoItem = Domain.Enums.TipoItem.PorcaoCozinha, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true },
-            new { Id = 7, Nome = "Chopp 500ml", Preco = 14.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressao = Domain.Enums.SetorImpressao.BarCopa, Ativo = true },
-            new { Id = 8, Nome = "Refrigerante Lata", Preco = 8.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressao = Domain.Enums.SetorImpressao.BarCopa, Ativo = true },
-            new { Id = 9, Nome = "Suco Jarra", Preco = 22.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressao = Domain.Enums.SetorImpressao.BarCopa, Ativo = true },
-            new { Id = 10, Nome = "Petit Gateau", Preco = 24.90m, CategoriaId = 5, TipoItem = Domain.Enums.TipoItem.Sobremesa, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true });
+            new { Id = 1, Nome = "Rodízio Completo Adulto", Preco = 89.90m, CategoriaId = 1, TipoItem = Domain.Enums.TipoItem.Rodizio, SetorImpressao = Domain.Enums.SetorImpressao.Nenhum, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 2, Nome = "Rodízio Infantil", Preco = 44.90m, CategoriaId = 1, TipoItem = Domain.Enums.TipoItem.Rodizio, SetorImpressao = Domain.Enums.SetorImpressao.Nenhum, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 3, Nome = "Picanha na Tábua", Preco = 119.90m, CategoriaId = 2, TipoItem = Domain.Enums.TipoItem.CarneAlaCarte, SetorImpressao = Domain.Enums.SetorImpressao.Churrasqueira, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 4, Nome = "Costela no Bafo", Preco = 99.90m, CategoriaId = 2, TipoItem = Domain.Enums.TipoItem.CarneAlaCarte, SetorImpressao = Domain.Enums.SetorImpressao.Churrasqueira, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 5, Nome = "Polenta Frita", Preco = 32.90m, CategoriaId = 3, TipoItem = Domain.Enums.TipoItem.PorcaoCozinha, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 6, Nome = "Mandioca Frita", Preco = 34.90m, CategoriaId = 3, TipoItem = Domain.Enums.TipoItem.PorcaoCozinha, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 7, Nome = "Chopp 500ml", Preco = 14.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressao = Domain.Enums.SetorImpressao.BarCopa, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 8, Nome = "Refrigerante Lata", Preco = 8.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressao = Domain.Enums.SetorImpressao.BarCopa, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 9, Nome = "Suco Jarra", Preco = 22.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressao = Domain.Enums.SetorImpressao.BarCopa, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
+            new { Id = 10, Nome = "Petit Gateau", Preco = 24.90m, CategoriaId = 5, TipoItem = Domain.Enums.TipoItem.Sobremesa, SetorImpressao = Domain.Enums.SetorImpressao.Cozinha, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m });
 
         modelBuilder.Entity<GrupoModificador>().HasData(
             new GrupoModificador { Id = 1, Nome = "Ponto da Carne", Obrigatorio = true, SelecaoUnica = true },

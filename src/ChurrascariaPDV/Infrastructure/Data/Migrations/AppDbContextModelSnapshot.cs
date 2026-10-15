@@ -795,6 +795,54 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.ToTable("MovimentacoesCaixa");
                 });
 
+            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.MovimentacaoEstoque", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("DataHora")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ItemPedidoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Observacao")
+                        .HasMaxLength(250)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProdutoId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Quantidade")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SaldoApos")
+                        .HasPrecision(10, 3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DataHora");
+
+                    b.HasIndex("ItemPedidoId")
+                        .IsUnique();
+
+                    b.HasIndex("ProdutoId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("MovimentacoesEstoque");
+                });
+
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.OpcaoModificador", b =>
                 {
                     b.Property<int>("Id")
@@ -963,12 +1011,19 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Property<int>("CategoriaId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ControlaEstoque")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Preco")
                         .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("QuantidadeEstoque")
+                        .HasPrecision(10, 3)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("SetorImpressao")
@@ -991,8 +1046,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 1,
                             Ativo = true,
                             CategoriaId = 1,
+                            ControlaEstoque = false,
                             Nome = "Rodízio Completo Adulto",
                             Preco = 89.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Nenhum",
                             TipoItem = "Rodizio"
                         },
@@ -1001,8 +1058,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 2,
                             Ativo = true,
                             CategoriaId = 1,
+                            ControlaEstoque = false,
                             Nome = "Rodízio Infantil",
                             Preco = 44.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Nenhum",
                             TipoItem = "Rodizio"
                         },
@@ -1011,8 +1070,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 3,
                             Ativo = true,
                             CategoriaId = 2,
+                            ControlaEstoque = false,
                             Nome = "Picanha na Tábua",
                             Preco = 119.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Churrasqueira",
                             TipoItem = "CarneAlaCarte"
                         },
@@ -1021,8 +1082,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 4,
                             Ativo = true,
                             CategoriaId = 2,
+                            ControlaEstoque = false,
                             Nome = "Costela no Bafo",
                             Preco = 99.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Churrasqueira",
                             TipoItem = "CarneAlaCarte"
                         },
@@ -1031,8 +1094,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 5,
                             Ativo = true,
                             CategoriaId = 3,
+                            ControlaEstoque = false,
                             Nome = "Polenta Frita",
                             Preco = 32.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Cozinha",
                             TipoItem = "PorcaoCozinha"
                         },
@@ -1041,8 +1106,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 6,
                             Ativo = true,
                             CategoriaId = 3,
+                            ControlaEstoque = false,
                             Nome = "Mandioca Frita",
                             Preco = 34.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Cozinha",
                             TipoItem = "PorcaoCozinha"
                         },
@@ -1051,8 +1118,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 7,
                             Ativo = true,
                             CategoriaId = 4,
+                            ControlaEstoque = false,
                             Nome = "Chopp 500ml",
                             Preco = 14.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "BarCopa",
                             TipoItem = "Bebida"
                         },
@@ -1061,8 +1130,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 8,
                             Ativo = true,
                             CategoriaId = 4,
+                            ControlaEstoque = false,
                             Nome = "Refrigerante Lata",
                             Preco = 8.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "BarCopa",
                             TipoItem = "Bebida"
                         },
@@ -1071,8 +1142,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 9,
                             Ativo = true,
                             CategoriaId = 4,
+                            ControlaEstoque = false,
                             Nome = "Suco Jarra",
                             Preco = 22.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "BarCopa",
                             TipoItem = "Bebida"
                         },
@@ -1081,8 +1154,10 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                             Id = 10,
                             Ativo = true,
                             CategoriaId = 5,
+                            ControlaEstoque = false,
                             Nome = "Petit Gateau",
                             Preco = 24.90m,
+                            QuantidadeEstoque = 0m,
                             SetorImpressao = "Cozinha",
                             TipoItem = "Sobremesa"
                         });
@@ -1331,6 +1406,31 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.MovimentacaoEstoque", b =>
+                {
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.ItemPedido", "ItemPedido")
+                        .WithMany()
+                        .HasForeignKey("ItemPedidoId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.Produto", "Produto")
+                        .WithMany("MovimentacoesEstoque")
+                        .HasForeignKey("ProdutoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ChurrascariaPDV.Domain.Entities.Usuario", "Usuario")
+                        .WithMany("MovimentacoesEstoque")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ItemPedido");
+
+                    b.Navigation("Produto");
+
+                    b.Navigation("Usuario");
+                });
+
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.Pedido", b =>
                 {
                     b.HasOne("ChurrascariaPDV.Domain.Entities.Comanda", "Comanda")
@@ -1424,6 +1524,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
                     b.Navigation("GruposModificadores");
 
                     b.Navigation("ItensPedido");
+
+                    b.Navigation("MovimentacoesEstoque");
                 });
 
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.TurnoCaixa", b =>
@@ -1436,6 +1538,8 @@ namespace ChurrascariaPDV.Infrastructure.Data.Migrations
             modelBuilder.Entity("ChurrascariaPDV.Domain.Entities.Usuario", b =>
                 {
                     b.Navigation("Pedidos");
+
+                    b.Navigation("MovimentacoesEstoque");
                 });
 #pragma warning restore 612, 618
         }

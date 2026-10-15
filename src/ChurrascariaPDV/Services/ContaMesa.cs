@@ -85,6 +85,7 @@ internal static class ContaMesa
     {
         var resumo = CalculoConta.Calcular(comanda);
         var temMovimento = resumo.Total > 0 || comanda.Pagamentos.Any(p => !p.Estornado);
+        EstoqueService.BaixarComanda(db, comanda, usuarioId);
         comanda.Status = temMovimento ? StatusComanda.Fechada : StatusComanda.Cancelada;
         comanda.DataHoraFechamento = DateTime.Now;
 

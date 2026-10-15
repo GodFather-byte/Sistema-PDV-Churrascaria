@@ -44,7 +44,7 @@
                         @grupo.Nome
                         @if (grupo.Sabores)
                         {
-                            <span class="text-muted small">até @produto.MaximoSabores sabores · partes iguais · @produto.RegraPrecoSabores</span>
+                            <span class="text-muted small">até @produto.MaximoSabores sabores · partes iguais · @Formato.RegraSabores(produto.RegraPrecoSabores)</span>
                         }
                         @if (grupo.Obrigatorio)
                         {
@@ -159,6 +159,7 @@
 
     private void AlternarOpcao(GrupoCardapio grupo, OpcaoCardapio opcao)
     {
+        _erroModificador = null;
         if (_opcoesSelecionadas.Remove(opcao.Id))
         {
             return;
@@ -170,11 +171,12 @@
             {
                 _opcoesSelecionadas.Remove(outra.Id);
             }
-            if (grupo.Sabores && grupo.Opcoes.Count(o => _opcoesSelecionadas.Contains(o.Id)) >= _produtoModificador!.MaximoSabores)
-            {
-                _erroModificador = $"Escolha até {_produtoModificador.MaximoSabores} sabores.";
-                return;
-            }
+        }
+        if (grupo.Sabores && _produtoModificador is { } produto &&
+            grupo.Opcoes.Count(o => _opcoesSelecionadas.Contains(o.Id)) >= produto.MaximoSabores)
+        {
+            _erroModificador = $"Escolha até {produto.MaximoSabores} sabores.";
+            return;
         }
 
         _opcoesSelecionadas.Add(opcao.Id);

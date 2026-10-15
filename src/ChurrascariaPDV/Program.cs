@@ -5,8 +5,10 @@ using ChurrascariaPDV.Services.Impressao;
 using ChurrascariaPDV.Services.Notificacoes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Data.Sqlite;
 
-var builder = WebApplication.CreateBuilder(args);
+var instalar = args.Contains("--instalar", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(args.Where(a => a != "--instalar").ToArray());
 
 var porta = builder.Configuration.GetValue("Servidor:Porta", 5000);
 builder.WebHost.UseUrls($"http://0.0.0.0:{porta}");
@@ -39,7 +41,35 @@ builder.Services.AddScoped<SessaoUsuario>();
 
 var app = builder.Build();
 
+var arquivoBanco = new SqliteConnectionStringBuilder(
+    builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=churrascaria.db").DataSource;
+var pendenciaInstalacao = $"{arquivoBanco}.instalacao-pendente";
+if (instalar)
+{
+    if (string.IsNullOrWhiteSpace(arquivoBanco) || arquivoBanco == ":memory:" || File.Exists(arquivoBanco))
+        throw new InvalidOperationException("A instalação exige um arquivo de banco novo. Nenhum banco existente será sobrescrito.");
+    await using (var reserva = new FileStream(pendenciaInstalacao, FileMode.CreateNew, FileAccess.Write)) { }
+}
+else if (File.Exists(pendenciaInstalacao))
+{
+    throw new InvalidOperationException("A instalação anterior não foi concluída. Não inicie este banco; consulte o erro do assistente e use uma pasta nova.");
+}
+
 await BancoDeDados.PrepararAsync(app.Services, app.Logger);
+if (instalar)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var usuarios = scope.ServiceProvider.GetRequiredService<UsuarioService>();
+    Console.WriteLine("Informe o PIN pessoal do gerente pela entrada padrão (não será exibido nem salvo na configuração).");
+    var pin = await Console.In.ReadLineAsync()
+        ?? throw new InvalidOperationException("Nenhum PIN informado. Instalação incompleta.");
+    await usuarios.CriarGerenteInicialAsync(builder.Configuration["Instalacao:NomeGerente"] ?? "Dono", pin);
+    File.Delete(pendenciaInstalacao);
+    Console.WriteLine("Instalação concluída. Perfil, exemplos e gerente configurados.");
+    await app.DisposeAsync();
+    return;
+}
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     await scope.ServiceProvider.GetRequiredService<SetorImpressaoService>()

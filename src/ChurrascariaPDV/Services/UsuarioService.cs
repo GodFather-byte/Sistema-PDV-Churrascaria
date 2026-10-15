@@ -71,9 +71,9 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
 
     public async Task SalvarAsync(Usuario dados)
     {
-        if (string.IsNullOrWhiteSpace(dados.Nome))
+        if (string.IsNullOrWhiteSpace(dados.Nome) || dados.Nome.Trim().Length > 100 || !Enum.IsDefined(dados.Perfil))
         {
-            throw new RegraNegocioException("Informe o nome do usuário.");
+            throw new RegraNegocioException("Informe um nome de até 100 caracteres e um perfil válido.");
         }
 
         var alterarPin = dados.Id == 0 || !string.IsNullOrEmpty(dados.PinAcesso);
@@ -83,6 +83,7 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
         }
 
         await using var db = await dbFactory.CreateDbContextAsync();
+        await using var transacao = await db.Database.BeginTransactionAsync();
         if (alterarPin && (await db.Usuarios.Where(u => u.Id != dados.Id).ToListAsync()).Any(u => ConferePin(u, dados.PinAcesso)))
         {
             throw new RegraNegocioException("Já existe um usuário com esse PIN.");
@@ -111,6 +112,7 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
         }
 
         await db.SaveChangesAsync();
+        await transacao.CommitAsync();
     }
 
     public async Task<UsuarioLogado> TrocarPinAsync(int id, string pinAtual, string novoPin, string confirmacao)
@@ -118,6 +120,7 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
         if (!PinValido(novoPin) || novoPin != confirmacao || novoPin == pinAtual)
             throw new RegraNegocioException("Informe e confirme um novo PIN de 4 dígitos, diferente do atual.");
         await using var db = await dbFactory.CreateDbContextAsync();
+        await using var transacao = await db.Database.BeginTransactionAsync();
         var usuario = await db.Usuarios.SingleOrDefaultAsync(u => u.Id == id && u.Ativo);
         if (usuario is null || !ConferePin(usuario, pinAtual))
             throw new RegraNegocioException("PIN atual inválido.");
@@ -126,6 +129,7 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
         usuario.PinAcesso = ProtegerPin(usuario, novoPin);
         usuario.TrocaPinObrigatoria = false;
         await db.SaveChangesAsync();
+        await transacao.CommitAsync();
         return new UsuarioLogado(usuario.Id, usuario.Nome, usuario.Perfil);
     }
 
@@ -143,7 +147,7 @@ public class UsuarioService(IDbContextFactory<AppDbContext> dbFactory)
 
     public async Task CriarGerenteInicialAsync(string nome, string pin)
     {
-        if (string.IsNullOrWhiteSpace(nome) || !PinValido(pin))
+        if (string.IsNullOrWhiteSpace(nome) || nome.Trim().Length > 100 || !PinValido(pin))
             throw new RegraNegocioException("Informe o nome do gerente e um PIN pessoal de 4 dígitos.");
         await using var db = await dbFactory.CreateDbContextAsync();
         await using var transacao = await db.Database.BeginTransactionAsync();

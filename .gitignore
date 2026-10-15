@@ -6,3 +6,5 @@
 .vs/
 *.user
 *.bak
+*.seed-pendente
+*.instalacao-pendente

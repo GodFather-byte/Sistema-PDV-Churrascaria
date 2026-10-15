@@ -14,13 +14,19 @@ public static class BancoDeDados
         await using var db = await factory.CreateDbContextAsync();
 
         await PreservarBancoLegadoAsync(db, logger);
-        var novo = !(await db.Database.GetAppliedMigrationsAsync()).Any();
+        var arquivo = new SqliteConnectionStringBuilder(db.Database.GetConnectionString()).DataSource;
+        var marcador = string.IsNullOrWhiteSpace(arquivo) || arquivo == ":memory:" ? null : $"{arquivo}.seed-pendente";
+        var novo = !(await db.Database.GetAppliedMigrationsAsync()).Any() || (marcador is not null && File.Exists(marcador));
+        var configuracao = novo
+            ? scope.ServiceProvider.GetRequiredService<IConfiguration>().GetSection("Instalacao").Get<InstalacaoOptions>() ?? new InstalacaoOptions()
+            : null;
+        if (novo && marcador is not null)
+            await File.WriteAllTextAsync(marcador, string.Empty);
         await db.Database.MigrateAsync();
         if (novo)
         {
-            var configuracao = scope.ServiceProvider.GetRequiredService<IConfiguration>()
-                .GetSection("Instalacao").Get<InstalacaoOptions>() ?? new InstalacaoOptions();
-            await SeedPerfil.AplicarAsync(db, configuracao);
+            await SeedPerfil.AplicarAsync(db, configuracao!);
+            if (marcador is not null) File.Delete(marcador);
         }
         foreach (var usuario in await db.Usuarios.ToListAsync())
         {

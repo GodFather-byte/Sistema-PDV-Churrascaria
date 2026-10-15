@@ -171,7 +171,7 @@
             @if (_grupoEditando is not null)
             {
                 <label class="form-label">Nome</label>
-                <input class="form-control mb-2" maxlength="60" @bind="_grupoEditando.Nome" placeholder="Ex.: Ponto da Carne" />
+                <input class="form-control mb-2" maxlength="60" @bind="_grupoEditando.Nome" placeholder="Ex.: Preparo ou adicionais" />
                 <div class="form-check">
                     <input id="grupo-obrigatorio" class="form-check-input" type="checkbox" @bind="_grupoEditando.Obrigatorio" />
                     <label class="form-check-label" for="grupo-obrigatorio">Obrigatório escolher</label>

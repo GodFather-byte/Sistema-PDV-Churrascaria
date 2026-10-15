@@ -64,6 +64,14 @@ public static class Formato
 
     public static string Setor(SetorImpressao? setor) => setor?.Nome ?? "Sem impressão";
 
+    public static string RegraSabores(RegraPrecoSabores regra) => regra switch
+    {
+        RegraPrecoSabores.MaiorValor => "maior valor",
+        RegraPrecoSabores.Media => "média",
+        RegraPrecoSabores.Soma => "soma",
+        _ => throw new ArgumentOutOfRangeException(nameof(regra))
+    };
+
     public static string TipoItem(TipoItem tipo) => tipo switch
     {
         Domain.Enums.TipoItem.Rodizio => "Rodízio",

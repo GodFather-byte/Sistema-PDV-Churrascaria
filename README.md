@@ -12,6 +12,38 @@ Os garçons lançam pedidos pelo celular conectado ao Wi-Fi do restaurante, sem 
 
 Pré-requisito: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
+### Instalar um estabelecimento novo (Windows)
+
+Na raiz do repositório, execute uma vez `dotnet restore` e depois:
+
+```powershell
+.\scripts\novo-estabelecimento.ps1
+```
+
+Se o Windows bloquear scripts, revise a política com o responsável pelo computador.
+Para permitir scripts locais apenas no terminal atual, pode-se usar
+`Set-ExecutionPolicy -Scope Process RemoteSigned` antes do assistente, sem alterar a política permanente.
+
+O assistente pergunta tipo, nome, pasta **nova**, nome do gerente e PIN pessoal com confirmação oculta.
+Publica a aplicação, gera um `appsettings.json` exclusivo, aplica as migrations e o seed do perfil
+e cria somente o gerente, sem PIN padrão. O PIN é enviado por entrada padrão e salvo apenas como hash.
+Não há necessidade de instalar o `dotnet-ef` no caixa. Para iniciar, execute `iniciar.ps1` na pasta criada.
+É necessário o runtime ASP.NET Core 8 no computador que executará a publicação.
+
+Parâmetros opcionais (o PIN continua sendo solicitado de forma oculta):
+
+```powershell
+.\scripts\novo-estabelecimento.ps1 -Tipo Pizzaria -Nome "Pizza da Casa" -NomeGerente "Dono" -Destino "C:\PDV\Pizza" -Porta 5001
+```
+
+O destino existente é recusado: **nunca** use este assistente para atualizar um banco de produção.
+Uma instalação incompleta mantém um marcador que impede iniciar sem concluir o gerente.
+Confira o erro e use uma pasta nova; preserve a pasta incompleta para diagnóstico.
+O seed também mantém um marcador de recuperação até sua transação terminar.
+Uma instalação por pasta/banco; não copie o código para personalizar cada perfil.
+
+Para desenvolvimento (sem gerente pré-configurado):
+
 ```bash
 dotnet run --project src/ChurrascariaPDV
 ```
@@ -25,6 +57,16 @@ Se existir um banco da primeira versão (criado sem migrations), ele é renomead
 O perfil inicial é uma churrascaria com taxa de serviço de 10% opcional por comanda e ticket de 48 colunas.
 Um gerente pode alterar o tipo e os dados do estabelecimento, a taxa e a largura do ticket em
 **Perfil do estabelecimento** (`/admin/estabelecimento`).
+
+### Painel do dono no celular (próxima etapa)
+
+É possível implementar um painel PWA instalável com vendas, caixa, mesas e produtos mais vendidos.
+Esse painel ficou **fora desta entrega**, por decisão de escopo.
+O sistema atual usa Blazor Server: precisa de conexão com o servidor; não promete operação offline.
+Para acesso fora do estabelecimento, planeje VPN ou proxy reverso com HTTPS, WebSockets, acesso restrito
+e autenticação forte do proprietário (não apenas o PIN operacional de quatro dígitos).
+Não encaminhe a porta HTTP do caixa diretamente para a internet. Nenhum túnel, certificado, hospedagem
+ou publicação externa é criado pelo assistente.
 
 ### Liberar o acesso dos celulares (Windows)
 

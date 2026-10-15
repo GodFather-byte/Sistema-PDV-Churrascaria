@@ -1,0 +1,30 @@
+@if (Aberto)
+{
+    <div class="pdv-modal-fundo" @onclick="FecharPeloFundo">
+        <div class="pdv-modal @Classe" @onclick:stopPropagation="true">
+            <div class="pdv-modal-cabecalho">
+                <h3>@Titulo</h3>
+                <button type="button" class="pdv-modal-fechar" aria-label="Fechar" @onclick="OnFechar">✕</button>
+            </div>
+            <div class="pdv-modal-corpo">
+                @ChildContent
+            </div>
+            @if (Rodape is not null)
+            {
+                <div class="pdv-modal-rodape">@Rodape</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Aberto { get; set; }
+    [Parameter] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public string? Classe { get; set; }
+    [Parameter] public bool FecharAoClicarFora { get; set; } = true;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Rodape { get; set; }
+    [Parameter] public EventCallback OnFechar { get; set; }
+
+    private Task FecharPeloFundo() => FecharAoClicarFora ? OnFechar.InvokeAsync() : Task.CompletedTask;
+}

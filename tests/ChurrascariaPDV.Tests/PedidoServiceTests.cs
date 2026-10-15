@@ -131,3 +131,18 @@ public class PedidoServiceTests
         Assert.Equal(StatusMesa.Ocupada, (await ambiente.Mesas.ObterDetalheAsync(1)).Status);
     }
 }
+
+public class CardapioServiceTests
+{
+    [Fact]
+    public async Task AgrupaCadaCategoriaUmaVez()
+    {
+        await using var ambiente = await AmbienteTeste.CriarAsync();
+
+        var cardapio = await ambiente.Servico<CardapioService>().ObterCardapioAsync();
+
+        Assert.Equal(["Rodízio", "Carnes", "Porções", "Bebidas", "Sobremesas"], cardapio.Select(c => c.Nome));
+        Assert.Equal(3, cardapio.Single(c => c.Nome == "Bebidas").Produtos.Count);
+        Assert.True(cardapio.SelectMany(c => c.Produtos).Single(p => p.Id == AmbienteTeste.Picanha).Grupos.Single().Obrigatorio);
+    }
+}

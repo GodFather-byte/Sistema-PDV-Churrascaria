@@ -51,6 +51,7 @@ public sealed class AmbienteTeste : IAsyncDisposable
         services.AddSingleton<ImpressaoService>();
         services.AddSingleton<NotificadorMesas>();
         services.AddScoped<UsuarioService>();
+        services.AddScoped<CardapioService>();
         services.AddScoped<MesaService>();
         services.AddScoped<PedidoService>();
         services.AddScoped<PagamentoService>();

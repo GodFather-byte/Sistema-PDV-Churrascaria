@@ -1,0 +1,82 @@
+@inject SessaoUsuario Sessao
+@inject UsuarioService Usuarios
+
+@if (_carregando)
+{
+    <div class="pdv-carregando">Carregando…</div>
+}
+else if (Sessao.Usuario is { } usuario && Permitido(usuario))
+{
+    @ChildContent(usuario)
+}
+else
+{
+    <div class="tela-login">
+        <div class="tela-login-cartao">
+            <div class="tela-login-marca">🔥</div>
+            <h1>@Titulo</h1>
+            @if (Sessao.Usuario is { } semPermissao)
+            {
+                <p class="text-warning">@semPermissao.Nome (@Formato.Perfil(semPermissao.Perfil)) não tem acesso a esta tela.</p>
+            }
+            <TecladoPin Titulo="Digite seu PIN" Erro="@_erro" Ocupado="_verificando" OnPinCompleto="EntrarAsync" />
+            @if (Voltar is not null)
+            {
+                <a class="tela-login-voltar" href="@Voltar">← Voltar</a>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Area { get; set; } = string.Empty;
+    [Parameter] public string Titulo { get; set; } = "Acesso";
+    [Parameter] public PerfilUsuario[] Perfis { get; set; } = Enum.GetValues<PerfilUsuario>();
+    [Parameter] public string? Voltar { get; set; } = "/";
+    [Parameter, EditorRequired] public RenderFragment<UsuarioLogado> ChildContent { get; set; } = null!;
+    [Parameter] public EventCallback<UsuarioLogado> OnEntrou { get; set; }
+
+    private bool _carregando = true;
+    private bool _verificando;
+    private string? _erro;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var usuario = await Sessao.RestaurarAsync(Area);
+        _carregando = false;
+        if (usuario is not null && Permitido(usuario))
+        {
+            await OnEntrou.InvokeAsync(usuario);
+        }
+    }
+
+    public async Task SairAsync()
+    {
+        await Sessao.SairAsync(Area);
+        StateHasChanged();
+    }
+
+    private bool Permitido(UsuarioLogado usuario) => Perfis.Contains(usuario.Perfil);
+
+    private async Task EntrarAsync(string pin)
+    {
+        _verificando = true;
+        _erro = null;
+        var usuario = await Usuarios.AutenticarAsync(pin);
+        _verificando = false;
+        if (usuario is null)
+        {
+            _erro = "PIN inválido";
+            return;
+        }
+
+        if (!Permitido(usuario))
+        {
+            _erro = $"{Formato.Perfil(usuario.Perfil)} não tem acesso aqui";
+            return;
+        }
+
+        await Sessao.EntrarAsync(Area, usuario);
+        await OnEntrou.InvokeAsync(usuario);
+    }
+}

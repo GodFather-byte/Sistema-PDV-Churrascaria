@@ -36,9 +36,9 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             .ToListAsync();
 
         return produtos
-            .GroupBy(p => p.Categoria)
-            .OrderBy(g => g.Key.Id)
-            .Select(g => new CategoriaCardapio(g.Key.Id, g.Key.Nome, g.OrderBy(p => p.Nome).Select(Mapear).ToList()))
+            .GroupBy(p => p.CategoriaId)
+            .OrderBy(g => g.Key)
+            .Select(g => new CategoriaCardapio(g.Key, g.First().Categoria.Nome, g.OrderBy(p => p.Nome).Select(Mapear).ToList()))
             .ToList();
     }
 

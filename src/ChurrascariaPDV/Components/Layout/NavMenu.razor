@@ -1,30 +1,38 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">ChurrascariaPDV</a>
+        <a class="navbar-brand" href="">🔥 Churrascaria PDV</a>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<input type="checkbox" title="Menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="flex-column">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Início</NavLink>
         </div>
-
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
+            <NavLink class="nav-link" href="caixa" Match="NavLinkMatch.All">Caixa (PDV)</NavLink>
         </div>
-
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
+            <NavLink class="nav-link" href="garcom">Garçom (celular)</NavLink>
+        </div>
+        <div class="nav-section px-3">Caixa</div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="caixa/turno">Turno e Sangria</NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="impressoes">Impressões</NavLink>
+        </div>
+        <div class="nav-section px-3">Gerência</div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="relatorios">Relatórios</NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="admin/produtos">Cardápio</NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="admin/usuarios">Usuários e PINs</NavLink>
         </div>
     </nav>
 </div>
-

@@ -1,0 +1,204 @@
+@page "/caixa/turno"
+@inherits ComponenteTempoReal
+@inject CaixaService CaixaService
+
+<PageTitle>Turno de Caixa</PageTitle>
+
+<AreaProtegida Area="caixa" Titulo="Turno de Caixa" Perfis="[PerfilUsuario.OperadorCaixa, PerfilUsuario.Gerente]" OnEntrou="AoEntrarAsync">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Turno de Caixa</h1>
+        <a class="btn btn-outline-light" href="caixa">← Voltar ao caixa</a>
+    </div>
+
+    <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+    @if (_resumo is null)
+    {
+        <div class="painel" style="max-width: 480px">
+            <h2>Abrir caixa</h2>
+            <p class="text-muted">Informe o fundo de troco colocado na gaveta.</p>
+            <label class="form-label">Fundo de troco (R$)</label>
+            <input class="form-control form-control-lg mb-3" inputmode="decimal" @bind="_fundo" />
+            <button type="button" class="btn btn-lg btn-brasa w-100" disabled="@_ocupado" @onclick="() => AbrirAsync(context)">Abrir turno</button>
+        </div>
+    }
+    else
+    {
+        <div class="turno-grade">
+            <div class="painel">
+                <h2>Turno #@_resumo.TurnoId <small class="text-muted">aberto às @Formato.DataHora(_resumo.Abertura) por @_resumo.Operador</small></h2>
+                <ResumoTurnoTabela Resumo="_resumo" />
+            </div>
+
+            <div>
+                <div class="painel mb-3">
+                    <h2>Sangria / Suprimento</h2>
+                    <div class="btn-group w-100 mb-3">
+                        <button type="button" class="btn @(_tipo == TipoMovimentacaoCaixa.Sangria ? "btn-brasa" : "btn-outline-light")" @onclick="() => _tipo = TipoMovimentacaoCaixa.Sangria">Sangria (retirada)</button>
+                        <button type="button" class="btn @(_tipo == TipoMovimentacaoCaixa.Suprimento ? "btn-brasa" : "btn-outline-light")" @onclick="() => _tipo = TipoMovimentacaoCaixa.Suprimento">Suprimento (entrada)</button>
+                    </div>
+                    <label class="form-label">Valor (R$)</label>
+                    <input class="form-control mb-2" inputmode="decimal" @bind="_valorMovimentacao" />
+                    <label class="form-label">Observação @(_tipo == TipoMovimentacaoCaixa.Sangria ? "(obrigatória)" : string.Empty)</label>
+                    <input class="form-control mb-3" maxlength="250" @bind="_observacao" placeholder="Ex.: depósito no cofre" />
+                    <button type="button" class="btn btn-outline-light w-100" disabled="@_ocupado" @onclick="() => MovimentarAsync(context)">Registrar</button>
+                </div>
+
+                <div class="painel">
+                    <h2>Fechar caixa</h2>
+                    @if (_indicadores?.MesasOcupadas > 0)
+                    {
+                        <div class="alert alert-warning py-2">Ainda há @_indicadores.MesasOcupadas mesa(s) aberta(s).</div>
+                    }
+                    <label class="form-label">Dinheiro contado na gaveta (R$)</label>
+                    <input class="form-control form-control-lg mb-2" inputmode="decimal" @bind="_contado" @bind:event="oninput" />
+                    @if (Formato.TentarLerValor(_contado, out var contado))
+                    {
+                        var diferenca = contado - _resumo.DinheiroEsperado;
+                        <p class="@(diferenca == 0 ? "text-success" : "text-warning")">
+                            Esperado @Formato.Moeda(_resumo.DinheiroEsperado) · diferença <strong>@Formato.Moeda(diferenca)</strong>
+                        </p>
+                    }
+                    <input class="form-control mb-3" maxlength="250" @bind="_obsFechamento" placeholder="Observação (opcional)" />
+                    <button type="button" class="btn btn-lg btn-danger w-100" disabled="@_ocupado" @onclick="() => _confirmarFechamento = true">Fechar turno</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="painel mt-4">
+        <h2>Turnos anteriores</h2>
+        <table class="table table-dark table-sm">
+            <thead><tr><th>#</th><th>Abertura</th><th>Fechamento</th><th>Operador</th><th class="text-end">Fundo</th><th class="text-end">Esperado</th><th class="text-end">Contado</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var turno in _turnos.Where(t => !t.Aberto))
+                {
+                    <tr>
+                        <td>@turno.Id</td>
+                        <td>@Formato.DataHora(turno.DataHoraAbertura)</td>
+                        <td>@(turno.DataHoraFechamento is { } f ? Formato.DataHora(f) : "-")</td>
+                        <td>@turno.UsuarioAbertura?.Nome</td>
+                        <td class="text-end">@Formato.Moeda(turno.FundoTroco)</td>
+                        <td class="text-end">@Formato.Moeda(turno.ValorEsperadoDinheiro ?? 0)</td>
+                        <td class="text-end">@Formato.Moeda(turno.ValorFechamento ?? 0)</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-light" @onclick="() => VerTurnoAsync(turno.Id)">Ver</button>
+                            <button type="button" class="btn btn-sm btn-outline-light" @onclick="() => ReimprimirAsync(turno.Id)">Imprimir</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <Modal Aberto="_confirmarFechamento" Titulo="Confirmar fechamento do caixa?" OnFechar="() => _confirmarFechamento = false">
+        <ChildContent>
+            <p>O resumo será impresso no caixa. Depois disso, pagamentos só poderão ser recebidos em um novo turno.</p>
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="() => _confirmarFechamento = false">Voltar</button>
+            <button type="button" class="btn btn-lg btn-danger flex-grow-1" disabled="@_ocupado" @onclick="() => FecharAsync(context)">Fechar turno</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_turnoVisualizado is not null" Titulo="@($"Turno #{_turnoVisualizado?.TurnoId}")" OnFechar="() => _turnoVisualizado = null">
+        <ChildContent>
+            @if (_turnoVisualizado is not null)
+            {
+                <ResumoTurnoTabela Resumo="_turnoVisualizado" />
+            }
+        </ChildContent>
+    </Modal>
+</AreaProtegida>
+
+@code {
+    private ResumoTurno? _resumo;
+    private ResumoTurno? _turnoVisualizado;
+    private IndicadoresCaixa? _indicadores;
+    private List<TurnoCaixa> _turnos = [];
+    private string? _fundo = "100,00";
+    private TipoMovimentacaoCaixa _tipo = TipoMovimentacaoCaixa.Sangria;
+    private string? _valorMovimentacao;
+    private string? _observacao;
+    private string? _contado;
+    private string? _obsFechamento;
+    private bool _confirmarFechamento;
+    private bool _ocupado;
+    private bool _logado;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private async Task AoEntrarAsync(UsuarioLogado usuario)
+    {
+        _logado = true;
+        await CarregarAsync();
+    }
+
+    protected override async Task AoAlterarMesasAsync(int? mesaId)
+    {
+        if (_logado)
+        {
+            await CarregarAsync();
+        }
+    }
+
+    private async Task CarregarAsync()
+    {
+        _resumo = await CaixaService.ObterResumoAsync();
+        _indicadores = await CaixaService.ObterIndicadoresAsync();
+        _turnos = await CaixaService.ListarTurnosAsync();
+    }
+
+    private Task AbrirAsync(UsuarioLogado usuario) => ExecutarAsync(async () =>
+    {
+        if (!Formato.TentarLerValor(_fundo, out var fundo)) throw new RegraNegocioException("Valor do fundo inválido.");
+        await CaixaService.AbrirTurnoAsync(fundo, usuario.Id);
+    }, "Caixa aberto.");
+
+    private Task MovimentarAsync(UsuarioLogado usuario) => ExecutarAsync(async () =>
+    {
+        if (!Formato.TentarLerValor(_valorMovimentacao, out var valor)) throw new RegraNegocioException("Valor inválido.");
+        await CaixaService.RegistrarMovimentacaoAsync(_tipo, valor, _observacao, usuario.Id);
+        _valorMovimentacao = null;
+        _observacao = null;
+    }, $"{_tipo} registrada.");
+
+    private Task FecharAsync(UsuarioLogado usuario) => ExecutarAsync(async () =>
+    {
+        if (!Formato.TentarLerValor(_contado, out var contado)) throw new RegraNegocioException("Informe o dinheiro contado na gaveta.");
+        _turnoVisualizado = await CaixaService.FecharTurnoAsync(contado, _obsFechamento, usuario.Id);
+        _confirmarFechamento = false;
+        _contado = null;
+        _obsFechamento = null;
+    }, "Turno fechado e resumo impresso.");
+
+    private async Task VerTurnoAsync(int turnoId) => _turnoVisualizado = await CaixaService.ObterResumoAsync(turnoId);
+
+    private Task ReimprimirAsync(int turnoId) => ExecutarAsync(async () =>
+    {
+        if (!await CaixaService.ReimprimirFechamentoAsync(turnoId)) throw new RegraNegocioException("Falha na impressora do caixa.");
+    }, "Resumo reimpresso.");
+
+    private async Task ExecutarAsync(Func<Task> acao, string sucesso)
+    {
+        if (_ocupado) return;
+        _ocupado = true;
+        try
+        {
+            await acao();
+            await CarregarAsync();
+            _aviso = sucesso;
+            _tipoAviso = "sucesso";
+        }
+        catch (RegraNegocioException ex)
+        {
+            _confirmarFechamento = false;
+            _aviso = ex.Message;
+            _tipoAviso = "erro";
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+}

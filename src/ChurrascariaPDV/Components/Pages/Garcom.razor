@@ -1,0 +1,477 @@
+@page "/garcom"
+@layout TelaCheiaLayout
+@inherits ComponenteTempoReal
+@inject MesaService MesaService
+@inject PedidoService PedidoService
+@inject SessaoUsuario Sessao
+@inject IJSRuntime JS
+
+<PageTitle>Garçom · Churrascaria</PageTitle>
+
+<AreaProtegida @ref="_area" Area="garcom" Titulo="Garçom" Voltar="@null" OnEntrou="AoEntrarAsync">
+    <div class="garcom">
+        <header class="garcom-topo">
+            @if (_aba != Aba.Mesas && _detalhe is not null)
+            {
+                <button type="button" class="garcom-voltar" @onclick="() => _aba = Aba.Mesas">‹</button>
+                <div class="garcom-titulo">
+                    <strong>Mesa @_detalhe.Numero</strong>
+                    <span class="status-pill status-@Formato.ClasseStatus(_detalhe.Status)">@Formato.Status(_detalhe.Status)</span>
+                </div>
+                <div class="garcom-saldo">@Formato.Moeda(_detalhe.Resumo.Saldo)</div>
+            }
+            else
+            {
+                <div class="garcom-titulo">
+                    <strong>🔥 Mesas</strong>
+                    <span class="text-muted small">@context.Nome</span>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-light" @onclick="SairAsync">Sair</button>
+            }
+        </header>
+
+        <Aviso Mensagem="@_aviso" Tipo="@_tipoAviso" OnFechar="() => _aviso = null" />
+
+        <main class="garcom-conteudo @(_aba == Aba.Lancar && Carrinho.Count > 0 ? "com-carrinho" : string.Empty)">
+            @switch (_aba)
+            {
+                case Aba.Mesas:
+                    <div class="garcom-filtros">
+                        @foreach (var (filtro, nome) in Filtros)
+                        {
+                            <button type="button" class="chip @(_filtro == filtro ? "ativo" : string.Empty)" @onclick="() => _filtro = filtro">
+                                @nome <small>@ContarFiltro(filtro)</small>
+                            </button>
+                        }
+                    </div>
+                    <MapaMesas Mesas="MesasFiltradas" SelecionadaId="_mesaId" OnSelecionar="SelecionarMesaAsync" />
+                    <LegendaMesas />
+                    break;
+
+                case Aba.Lancar when _detalhe is not null:
+                    @if (_detalhe.Status == StatusMesa.AguardandoLimpeza)
+                    {
+                        <div class="garcom-alerta">Mesa aguardando limpeza. Ao lançar um item ela será reaberta.</div>
+                    }
+                    <div class="garcom-comandas">
+                        <button type="button" class="chip @(_comandaId is null ? "ativo" : string.Empty)" @onclick="() => _comandaId = null">Conta Geral</button>
+                        @foreach (var comanda in _detalhe.Comandas.Where(c => !c.ContaGeral))
+                        {
+                            <button type="button" class="chip @(_comandaId == comanda.Id ? "ativo" : string.Empty)" @onclick="() => _comandaId = comanda.Id">
+                                @comanda.CodigoNumero@(comanda.NomeCliente is null ? string.Empty : $" · {comanda.NomeCliente}")
+                            </button>
+                        }
+                        <button type="button" class="chip chip-tracejado" @onclick="AbrirNovaComanda">+ Comanda</button>
+                    </div>
+                    <SeletorProdutos OnAdicionar="AdicionarAoCarrinho" />
+                    break;
+
+                case Aba.Conta when _detalhe is not null:
+                    <section class="garcom-conta">
+                        <div class="garcom-pessoas">
+                            <span>Pessoas na mesa</span>
+                            <div class="stepper">
+                                <button type="button" disabled="@(!MesaAberta || _detalhe.QuantidadePessoas <= 1)" @onclick="() => AlterarPessoasAsync(-1)">−</button>
+                                <strong>@_detalhe.QuantidadePessoas</strong>
+                                <button type="button" disabled="@(!MesaAberta)" @onclick="() => AlterarPessoasAsync(1)">+</button>
+                            </div>
+                        </div>
+
+                        @if (!_detalhe.TemConsumo)
+                        {
+                            <p class="text-muted text-center py-4">Nenhum item lançado nesta mesa.</p>
+                        }
+                        @foreach (var comanda in _detalhe.Comandas.Where(c => c.Itens.Count > 0 || !c.ContaGeral))
+                        {
+                            <div class="garcom-comanda-bloco">
+                                <div class="garcom-comanda-cabecalho">
+                                    <strong>@comanda.Descricao</strong>
+                                    <span>@Formato.Moeda(comanda.Resumo.Saldo)</span>
+                                </div>
+                                @foreach (var item in comanda.Itens)
+                                {
+                                    <div class="garcom-item @(item.Cancelado ? "cancelado" : string.Empty)">
+                                        <span class="qtd">@Formato.Qtd(item.Quantidade)×</span>
+                                        <span class="nome">
+                                            @item.Produto
+                                            @if (!string.IsNullOrEmpty(item.Observacoes))
+                                            {
+                                                <small>@item.Observacoes</small>
+                                            }
+                                            <small>@Formato.Hora(item.DataHora) · @item.Garcom@(item.Cancelado ? $" · cancelado: {item.MotivoCancelamento}" : string.Empty)</small>
+                                        </span>
+                                        <span class="valor">@Formato.Moeda(item.Total)</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <div class="resumo-conta">
+                            <div><span>Subtotal</span><span>@Formato.Moeda(_detalhe.Resumo.Subtotal)</span></div>
+                            <div><span>Serviço (10%)</span><span>@Formato.Moeda(_detalhe.Resumo.TaxaServico)</span></div>
+                            @if (_detalhe.Resumo.Pago > 0)
+                            {
+                                <div><span>Já pago</span><span>− @Formato.Moeda(_detalhe.Resumo.Pago)</span></div>
+                            }
+                            <div class="total"><span>Saldo</span><span>@Formato.Moeda(_detalhe.Resumo.Saldo)</span></div>
+                            @if (_detalhe.QuantidadePessoas > 1)
+                            {
+                                <div class="divisao">
+                                    @Formato.Moeda(_detalhe.Resumo.Saldo) / @_detalhe.QuantidadePessoas pessoas =
+                                    <strong>@Formato.Moeda(_detalhe.Resumo.ValorPorPessoa(_detalhe.QuantidadePessoas))</strong> por pessoa
+                                </div>
+                            }
+                        </div>
+
+                        <button type="button" class="btn btn-conta w-100" disabled="@(!_detalhe.TemConsumo || _ocupado)" @onclick="() => _confirmarConta = true">
+                            Pedir Fechamento / Pré-Conta
+                        </button>
+                    </section>
+                    break;
+            }
+        </main>
+
+        @if (_aba == Aba.Lancar && Carrinho.Count > 0)
+        {
+            <div class="garcom-carrinho @(_carrinhoAberto ? "aberto" : string.Empty)">
+                <button type="button" class="garcom-carrinho-resumo" @onclick="() => _carrinhoAberto = !_carrinhoAberto">
+                    <span>🛒 @Formato.Qtd(Carrinho.Sum(i => i.Quantidade)) itens · @NomeComandaSelecionada</span>
+                    <strong>@Formato.Moeda(Carrinho.Sum(i => i.Total))</strong>
+                    <span class="seta">@(_carrinhoAberto ? "▾" : "▴")</span>
+                </button>
+                @if (_carrinhoAberto)
+                {
+                    <div class="garcom-carrinho-itens">
+                        @foreach (var item in Carrinho)
+                        {
+                            <div class="garcom-carrinho-item">
+                                <div class="nome">
+                                    @item.Produto.Nome
+                                    @if (!string.IsNullOrEmpty(item.Detalhes))
+                                    {
+                                        <small>@item.Detalhes</small>
+                                    }
+                                </div>
+                                <div class="stepper pequeno">
+                                    <button type="button" @onclick="() => AlterarQuantidade(item, -1)">−</button>
+                                    <strong>@Formato.Qtd(item.Quantidade)</strong>
+                                    <button type="button" @onclick="() => AlterarQuantidade(item, 1)">+</button>
+                                </div>
+                            </div>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-danger mt-2" @onclick="LimparCarrinho">Limpar carrinho</button>
+                    </div>
+                }
+                <button type="button" class="btn btn-enviar" disabled="@_ocupado" @onclick="EnviarPedidoAsync">
+                    @(_ocupado ? "Enviando…" : "Enviar Pedido para Produção")
+                </button>
+            </div>
+        }
+
+        <nav class="garcom-abas">
+            <button type="button" class="@(_aba == Aba.Mesas ? "ativo" : string.Empty)" @onclick="() => _aba = Aba.Mesas">
+                <span>▦</span>Mesas
+            </button>
+            <button type="button" class="@(_aba == Aba.Lancar ? "ativo" : string.Empty)" disabled="@(_detalhe is null)" @onclick="() => _aba = Aba.Lancar">
+                <span>＋</span>Lançar
+                @if (Carrinho.Count > 0)
+                {
+                    <b class="contador">@Carrinho.Count</b>
+                }
+            </button>
+            <button type="button" class="@(_aba == Aba.Conta ? "ativo" : string.Empty)" disabled="@(_detalhe is null)" @onclick="() => _aba = Aba.Conta">
+                <span>≡</span>Conta
+            </button>
+        </nav>
+    </div>
+
+    <Modal Aberto="_confirmarConta" Titulo="@($"Fechar a mesa {_detalhe?.Numero}?")" OnFechar="() => _confirmarConta = false">
+        <ChildContent>
+            <p>A mesa ficará <strong class="text-warning">amarela (conta pedida)</strong> e a conferência será impressa no caixa.</p>
+            <p class="fs-4 text-center">Saldo: <strong>@Formato.Moeda(_detalhe?.Resumo.Saldo ?? 0)</strong></p>
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="() => _confirmarConta = false">Voltar</button>
+            <button type="button" class="btn btn-lg btn-conta flex-grow-1" disabled="@_ocupado" @onclick="PedirContaAsync">Confirmar</button>
+        </Rodape>
+    </Modal>
+
+    <Modal Aberto="_novaComanda" Titulo="Nova comanda individual" OnFechar="() => _novaComanda = false">
+        <ChildContent>
+            <label class="form-label">Número do cartão (vazio = automático)</label>
+            <input class="form-control form-control-lg mb-3" inputmode="numeric" @bind="_codigoComanda" placeholder="Ex.: 105" />
+            <label class="form-label">Nome do cliente (opcional)</label>
+            <input class="form-control form-control-lg" maxlength="60" @bind="_nomeComanda" placeholder="Ex.: Ana" />
+        </ChildContent>
+        <Rodape>
+            <button type="button" class="btn btn-lg btn-secondary" @onclick="() => _novaComanda = false">Cancelar</button>
+            <button type="button" class="btn btn-lg btn-brasa flex-grow-1" disabled="@_ocupado" @onclick="CriarComandaAsync">Criar</button>
+        </Rodape>
+    </Modal>
+</AreaProtegida>
+
+@code {
+    private enum Aba { Mesas, Lancar, Conta }
+
+    private enum FiltroMesa { Todas, Livres, Ocupadas, Conta }
+
+    private static readonly (FiltroMesa, string)[] Filtros =
+        [(FiltroMesa.Todas, "Todas"), (FiltroMesa.Livres, "Livres"), (FiltroMesa.Ocupadas, "Ocupadas"), (FiltroMesa.Conta, "Conta")];
+
+    private AreaProtegida _area = null!;
+    private UsuarioLogado? _usuario;
+    private Aba _aba = Aba.Mesas;
+    private FiltroMesa _filtro = FiltroMesa.Todas;
+    private List<MesaResumo> _mesas = [];
+    private int? _mesaId;
+    private MesaDetalhe? _detalhe;
+    private int? _comandaId;
+    private readonly Dictionary<int, List<ItemCarrinho>> _carrinhos = [];
+    private bool _carrinhoAberto;
+    private bool _ocupado;
+    private bool _confirmarConta;
+    private bool _novaComanda;
+    private string? _codigoComanda;
+    private string? _nomeComanda;
+    private string? _aviso;
+    private string _tipoAviso = "info";
+
+    private List<ItemCarrinho> Carrinho => _mesaId is { } id
+        ? _carrinhos.TryGetValue(id, out var lista) ? lista : _carrinhos[id] = []
+        : [];
+
+    private bool MesaAberta => _detalhe?.Status is StatusMesa.Ocupada or StatusMesa.ContaSolicitada;
+
+    private string NomeComandaSelecionada => _comandaId is null
+        ? "Conta Geral"
+        : $"Comanda {_detalhe?.Comandas.FirstOrDefault(c => c.Id == _comandaId)?.CodigoNumero}";
+
+    private IReadOnlyList<MesaResumo> MesasFiltradas => _mesas.Where(m => Filtrar(m, _filtro)).ToList();
+
+    private int ContarFiltro(FiltroMesa filtro) => _mesas.Count(m => Filtrar(m, filtro));
+
+    private static bool Filtrar(MesaResumo mesa, FiltroMesa filtro) => filtro switch
+    {
+        FiltroMesa.Livres => mesa.Status == StatusMesa.Livre,
+        FiltroMesa.Ocupadas => mesa.Status is StatusMesa.Ocupada or StatusMesa.ContaSolicitada,
+        FiltroMesa.Conta => mesa.Status == StatusMesa.ContaSolicitada,
+        _ => true
+    };
+
+    private async Task AoEntrarAsync(UsuarioLogado usuario)
+    {
+        _usuario = usuario;
+        _mesas = await MesaService.ListarMapaAsync();
+    }
+
+    protected override async Task AoAlterarMesasAsync(int? mesaId)
+    {
+        if (_usuario is null)
+        {
+            return;
+        }
+
+        _mesas = await MesaService.ListarMapaAsync();
+        if (_mesaId is { } atual && (mesaId is null || mesaId == atual))
+        {
+            await RecarregarDetalheAsync();
+        }
+    }
+
+    private async Task SelecionarMesaAsync(MesaResumo mesa)
+    {
+        await JS.InvokeVoidAsync("pdv.vibrar", 20);
+        if (_mesaId != mesa.Id)
+        {
+            _comandaId = null;
+            _carrinhoAberto = false;
+        }
+
+        _mesaId = mesa.Id;
+        await RecarregarDetalheAsync();
+        _aba = Aba.Lancar;
+    }
+
+    private async Task RecarregarDetalheAsync()
+    {
+        if (_mesaId is not { } id)
+        {
+            return;
+        }
+
+        _detalhe = await MesaService.ObterDetalheAsync(id);
+        if (_comandaId is { } comanda && _detalhe.Comandas.All(c => c.Id != comanda))
+        {
+            _comandaId = null;
+        }
+    }
+
+    private void AdicionarAoCarrinho(ItemCarrinho item)
+    {
+        ItemCarrinho.Adicionar(Carrinho, item);
+        _ = JS.InvokeVoidAsync("pdv.vibrar", 15);
+        Avisar($"+ {Formato.Qtd(item.Quantidade)} {item.Produto.Nome}", "sucesso");
+    }
+
+    private void AlterarQuantidade(ItemCarrinho item, int delta)
+    {
+        item.Quantidade += delta;
+        if (item.Quantidade <= 0)
+        {
+            Carrinho.Remove(item);
+        }
+
+        if (Carrinho.Count == 0)
+        {
+            _carrinhoAberto = false;
+        }
+    }
+
+    private void LimparCarrinho()
+    {
+        Carrinho.Clear();
+        _carrinhoAberto = false;
+    }
+
+    private async Task EnviarPedidoAsync()
+    {
+        if (_usuario is null || _mesaId is not { } mesaId || Carrinho.Count == 0)
+        {
+            return;
+        }
+
+        await ExecutarAsync(async () =>
+        {
+            var resultado = await PedidoService.LancarPedidoAsync(
+                new NovoPedido(mesaId, _comandaId, _usuario.Id, Carrinho.Select(i => i.ParaPedido()).ToList()));
+            Carrinho.Clear();
+            _carrinhoAberto = false;
+            await RecarregarDetalheAsync();
+            await JS.InvokeVoidAsync("pdv.vibrar", 60);
+            if (resultado.ImpressoComSucesso)
+            {
+                Avisar($"Pedido enviado! Mesa {_detalhe?.Numero}", "sucesso");
+            }
+            else
+            {
+                Avisar($"Pedido salvo, mas a impressora falhou: {string.Join(", ", resultado.SetoresComFalha.Select(Formato.Setor))}. Avise o caixa.", "erro");
+            }
+        });
+    }
+
+    private async Task AlterarPessoasAsync(int delta)
+    {
+        if (_detalhe is null)
+        {
+            return;
+        }
+
+        await ExecutarAsync(async () =>
+        {
+            await MesaService.DefinirPessoasAsync(_detalhe.Id, Math.Max(1, _detalhe.QuantidadePessoas + delta));
+            await RecarregarDetalheAsync();
+        });
+    }
+
+    private async Task PedirContaAsync()
+    {
+        if (_detalhe is null)
+        {
+            return;
+        }
+
+        await ExecutarAsync(async () =>
+        {
+            var impresso = await MesaService.SolicitarContaAsync(_detalhe.Id);
+            _confirmarConta = false;
+            await RecarregarDetalheAsync();
+            Avisar(impresso ? "Conta solicitada. Pré-conta impressa no caixa." : "Conta solicitada, mas a impressora do caixa falhou.",
+                impresso ? "sucesso" : "erro");
+        });
+    }
+
+    private void AbrirNovaComanda()
+    {
+        _codigoComanda = null;
+        _nomeComanda = null;
+        _novaComanda = true;
+    }
+
+    private async Task CriarComandaAsync()
+    {
+        if (_mesaId is not { } mesaId)
+        {
+            return;
+        }
+
+        int? codigo = null;
+        if (!string.IsNullOrWhiteSpace(_codigoComanda))
+        {
+            if (!int.TryParse(_codigoComanda, out var numero))
+            {
+                Avisar("Número de comanda inválido.", "erro");
+                return;
+            }
+
+            codigo = numero;
+        }
+
+        await ExecutarAsync(async () =>
+        {
+            _comandaId = await MesaService.CriarComandaAsync(mesaId, codigo, _nomeComanda);
+            _novaComanda = false;
+            await RecarregarDetalheAsync();
+        });
+    }
+
+    private async Task SairAsync()
+    {
+        _usuario = null;
+        _detalhe = null;
+        _mesaId = null;
+        _aba = Aba.Mesas;
+        await _area.SairAsync();
+    }
+
+    private async Task ExecutarAsync(Func<Task> acao)
+    {
+        if (_ocupado)
+        {
+            return;
+        }
+
+        _ocupado = true;
+        try
+        {
+            await acao();
+        }
+        catch (RegraNegocioException ex)
+        {
+            Avisar(ex.Message, "erro");
+        }
+        catch (Exception ex) when (ex is Microsoft.EntityFrameworkCore.DbUpdateException or Microsoft.Data.Sqlite.SqliteException)
+        {
+            // Outro terminal gravou a mesma mesa no mesmo instante: os dados na tela podem estar desatualizados.
+            Avisar("Outro terminal alterou esta mesa ao mesmo tempo. Confira e tente novamente.", "erro");
+        }
+        finally
+        {
+            _ocupado = false;
+        }
+    }
+
+    private void Avisar(string mensagem, string tipo)
+    {
+        _aviso = mensagem;
+        _tipoAviso = tipo;
+        var atual = mensagem;
+        _ = Task.Delay(tipo == "erro" ? 6000 : 2500).ContinueWith(_ => InvokeAsync(() =>
+        {
+            if (_aviso == atual)
+            {
+                _aviso = null;
+                StateHasChanged();
+            }
+        }));
+    }
+}

@@ -1,0 +1,59 @@
+@page "/impressoes"
+@implements IDisposable
+@inject HistoricoImpressoes Historico
+@inject ImpressaoService Impressao
+
+<PageTitle>Impressões</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="mb-0">Impressões</h1>
+    <button type="button" class="btn btn-outline-light" @onclick="Historico.Limpar">Limpar histórico</button>
+</div>
+
+<div class="painel mb-3">
+    @if (Impressao.Configuracao.ModoSimulacao)
+    {
+        <p class="mb-1"><span class="badge bg-warning text-dark">MODO SIMULAÇÃO</span> Nenhum ticket é enviado às impressoras; eles aparecem aqui e no console.</p>
+        <p class="text-muted small mb-0">Para imprimir de verdade, configure os IPs e defina <code>"ModoSimulacao": false</code> em <code>appsettings.json</code>.</p>
+    }
+    else
+    {
+        <p class="mb-0"><span class="badge bg-success">IMPRESSORAS ATIVAS</span> Tickets enviados via TCP (ESC/POS).</p>
+    }
+    <div class="d-flex flex-wrap gap-3 mt-2 small">
+        @foreach (var (setor, config) in Impressao.Configuracao.Impressoras)
+        {
+            <span>@Formato.Setor(setor): <code>@config.Ip:@config.Porta</code>@(config.Habilitada ? string.Empty : " (desabilitada)")</span>
+        }
+    </div>
+</div>
+
+<div class="tickets">
+    @foreach (var registro in Historico.Listar())
+    {
+        <div class="ticket @(registro.Sucesso ? string.Empty : "falha")">
+            <div class="ticket-cabecalho">
+                <strong>@Formato.Setor(registro.Setor)</strong>
+                <span>@registro.DataHora.ToString("HH:mm:ss")</span>
+            </div>
+            <div class="ticket-sub">@registro.Titulo · @registro.Destino @(registro.Simulado ? "· simulado" : string.Empty)</div>
+            @if (registro.Erro is not null)
+            {
+                <div class="text-danger small">@registro.Erro</div>
+            }
+            <pre>@registro.Conteudo</pre>
+        </div>
+    }
+    @if (Historico.Listar().Count == 0)
+    {
+        <p class="text-muted">Nenhum ticket desde que o sistema foi iniciado.</p>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Historico.Alterado += Atualizar;
+
+    private void Atualizar() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Historico.Alterado -= Atualizar;
+}

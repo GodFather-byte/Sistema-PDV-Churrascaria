@@ -1,0 +1,108 @@
+@page "/relatorios"
+@inject RelatorioService RelatorioService
+
+<PageTitle>Relatórios</PageTitle>
+
+<AreaProtegida Area="gerencia" Titulo="Relatórios (Gerente)" Perfis="[PerfilUsuario.Gerente]" OnEntrou="_ => GerarAsync()">
+    <h1>Relatórios de vendas</h1>
+
+    <div class="painel d-flex flex-wrap gap-3 align-items-end mb-3">
+        <div>
+            <label class="form-label">De</label>
+            <input type="date" class="form-control" @bind="_inicio" />
+        </div>
+        <div>
+            <label class="form-label">Até</label>
+            <input type="date" class="form-control" @bind="_fim" />
+        </div>
+        <button type="button" class="btn btn-brasa" @onclick="GerarAsync">Gerar</button>
+        <button type="button" class="btn btn-outline-light" @onclick="() => DefinirPeriodoAsync(0)">Hoje</button>
+        <button type="button" class="btn btn-outline-light" @onclick="() => DefinirPeriodoAsync(7)">7 dias</button>
+        <button type="button" class="btn btn-outline-light" @onclick="() => DefinirPeriodoAsync(30)">30 dias</button>
+    </div>
+
+    @if (_relatorio is { } r)
+    {
+        <div class="cartoes-indicadores">
+            <div class="painel"><span>Total recebido</span><strong>@Formato.Moeda(r.TotalRecebido)</strong></div>
+            <div class="painel"><span>Serviço 10%</span><strong>@Formato.Moeda(r.TotalTaxaServico)</strong></div>
+            <div class="painel"><span>Contas fechadas</span><strong>@r.ContasFechadas</strong></div>
+            <div class="painel"><span>Ticket médio</span><strong>@Formato.Moeda(r.TicketMedio)</strong></div>
+        </div>
+
+        <div class="relatorio-grade">
+            <div class="painel">
+                <h2>Por forma de pagamento</h2>
+                <table class="table table-dark table-sm">
+                    <tbody>
+                        @foreach (var meio in r.PorMeio)
+                        {
+                            <tr><td>@Formato.Meio(meio.Meio)</td><td class="text-end">@meio.Quantidade</td><td class="text-end">@Formato.Moeda(meio.Valor)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="painel">
+                <h2>Por garçom</h2>
+                <table class="table table-dark table-sm">
+                    <thead><tr><th>Garçom</th><th class="text-end">Pedidos</th><th class="text-end">Vendas</th><th class="text-end">10% estimado</th></tr></thead>
+                    <tbody>
+                        @foreach (var garcom in r.Garcons)
+                        {
+                            <tr><td>@garcom.Garcom</td><td class="text-end">@garcom.Pedidos</td><td class="text-end">@Formato.Moeda(garcom.ValorItens)</td><td class="text-end">@Formato.Moeda(garcom.TaxaServicoEstimada)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="painel mt-3">
+            <h2>Produtos vendidos</h2>
+            <table class="table table-dark table-sm">
+                <thead><tr><th>Produto</th><th>Categoria</th><th class="text-end">Qtd</th><th class="text-end">Valor</th></tr></thead>
+                <tbody>
+                    @foreach (var produto in r.Produtos)
+                    {
+                        <tr><td>@produto.Produto</td><td>@produto.Categoria</td><td class="text-end">@Formato.Qtd(produto.Quantidade)</td><td class="text-end">@Formato.Moeda(produto.Valor)</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="painel mt-3">
+            <h2>Cancelamentos</h2>
+            <table class="table table-dark table-sm">
+                <thead><tr><th>Data</th><th>Mesa</th><th>Produto</th><th class="text-end">Qtd</th><th class="text-end">Valor</th><th>Motivo</th><th>Autorizado por</th><th>Garçom</th></tr></thead>
+                <tbody>
+                    @foreach (var c in r.Cancelamentos)
+                    {
+                        <tr><td>@Formato.DataHora(c.DataHora)</td><td>@c.Mesa</td><td>@c.Produto</td><td class="text-end">@Formato.Qtd(c.Quantidade)</td><td class="text-end">@Formato.Moeda(c.Valor)</td><td>@c.Motivo</td><td>@c.Gerente</td><td>@c.Garcom</td></tr>
+                    }
+                    @if (r.Cancelamentos.Count == 0)
+                    {
+                        <tr><td colspan="8" class="text-muted">Nenhum cancelamento no período.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</AreaProtegida>
+
+@code {
+    private DateTime _inicio = DateTime.Today;
+    private DateTime _fim = DateTime.Today;
+    private RelatorioVendas? _relatorio;
+
+    private async Task GerarAsync()
+    {
+        if (_fim < _inicio) (_inicio, _fim) = (_fim, _inicio);
+        _relatorio = await RelatorioService.GerarAsync(_inicio.Date, _fim.Date.AddDays(1));
+    }
+
+    private async Task DefinirPeriodoAsync(int dias)
+    {
+        _fim = DateTime.Today;
+        _inicio = DateTime.Today.AddDays(-dias);
+        await GerarAsync();
+    }
+}

@@ -8,3 +8,5 @@
 *.bak
 *.seed-pendente
 *.instalacao-pendente
+publicacao/
+saida/

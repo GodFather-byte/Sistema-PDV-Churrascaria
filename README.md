@@ -12,7 +12,24 @@ Os garçons lançam pedidos pelo celular conectado ao Wi-Fi do restaurante, sem 
 
 Pré-requisito: [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
-### Instalar um estabelecimento novo (Windows)
+### Instalador para Windows (recomendado)
+
+O GitHub Actions gera `PDV-Instalador-<versão>.exe` (workflow **Instalador**, em `.github/workflows/instalador.yml`):
+
+- **Versão oficial:** crie e envie uma tag, por exemplo `git tag v1.0.0` e `git push origin v1.0.0`.
+  O instalador fica anexado à Release da tag no GitHub.
+- **Teste:** em *Actions > Instalador > Run workflow*; o `.exe` fica em *Artifacts* da execução.
+
+O instalador já inclui o .NET (não precisa instalar nada antes), instala em `C:\PDV`, libera a porta 5000 no firewall
+e cria os atalhos **PDV - Caixa** e **Configurar PDV**. Na primeira instalação, abre uma janela que pede tipo, nome,
+gerente e PIN pessoal (sem PIN padrão). Para atualizar, execute o instalador de uma versão nova: o banco
+(`estabelecimento.db`), a configuração e os backups são preservados e as migrations rodam ao iniciar.
+Desinstalar também não apaga o banco nem os backups.
+
+O Windows pode mostrar o aviso do SmartScreen porque o instalador não é assinado digitalmente:
+clique em *Mais informações > Executar assim mesmo*.
+
+### Instalar um estabelecimento novo pelo código-fonte (Windows)
 
 Na raiz do repositório, execute uma vez `dotnet restore` e depois:
 
@@ -145,7 +162,13 @@ Cada instalação usa seu próprio banco; não há isolamento de múltiplos esta
 - **Cancelamento** (total ou parcial) exige PIN de gerente e motivo; o setor recebe um ticket “NÃO PREPARAR”.
   Não é permitido cancelar se os pagamentos já feitos passarem a ser maiores que o consumo.
 - **Taxa de serviço** configurável no perfil do estabelecimento e opcional por comanda quando habilitado; fica registrada em cada pagamento para o relatório.
-- **Estorno de pagamento** com PIN de gerente, enquanto a conta e o turno estiverem abertos.
+- **Estorno de pagamento** com PIN de gerente, enquanto a conta e o turno estiverem abertos. O gerente que autorizou,
+  o motivo e quem recebeu aparecem em **Relatórios > Estornos de pagamento**.
+- **Tentativas de PIN limitadas por aparelho**: após 5 PINs errados seguidos (login, troca de PIN ou PIN de gerente),
+  o aparelho fica bloqueado por 30 s, dobrando a cada novo erro até 15 min. Um PIN correto zera a contagem.
+- **Backup automático**: ao iniciar e a cada 24 h o banco é copiado para `backups/` (ao lado do banco), mantendo as 14 cópias
+  mais recentes. Ajuste com `Backup:Pasta` e `Backup:Retencao` no `appsettings.json`. Copie essa pasta para um pendrive ou nuvem
+  periodicamente; um backup no mesmo disco não protege contra falha do PC.
 - Novo item depois da pré-conta devolve a mesa para *Ocupada*.
 - **Estoque de produtos prontos**: ative o controle no cadastro do produto e lance entradas/saídas em Estoque.
   A venda baixa a quantidade quando a comanda é quitada; itens cancelados são registrados como perda.
@@ -174,6 +197,8 @@ Somente o modo de simulação e o timeout continuam em `src/ChurrascariaPDV/apps
 Com `ModoSimulacao: true` nada é enviado à rede: os tickets aparecem no console e na tela **Impressões** (`/impressoes`).
 Com `false`, os tickets são enviados em ESC/POS (code page PC860, corte parcial) por `TcpClient`. Se uma impressora falhar,
 o pedido continua salvo, o item aparece como “não impresso” no caixa e pode ser reimpresso.
+O sistema também tenta de novo sozinho após 15 s, 45 s e 2 min, enviando só para os setores que falharam
+(os que já imprimiram não recebem cópia). Se der certo, o aviso “não impresso” some.
 
 ## Modificadores e tipos de estabelecimento
 

@@ -26,6 +26,10 @@ builder.Services.AddSingleton<HistoricoImpressoes>();
 builder.Services.AddSingleton<ImpressaoService>();
 builder.Services.AddSingleton<NotificadorMesas>();
 builder.Services.AddSingleton<RedeLocalService>();
+builder.Services.AddSingleton<LimiteTentativasPin>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ProtecaoPin>();
+builder.Services.AddHostedService<BackupBancoService>();
 
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<CardapioService>();
@@ -61,7 +65,8 @@ if (instalar)
     await using var scope = app.Services.CreateAsyncScope();
     var usuarios = scope.ServiceProvider.GetRequiredService<UsuarioService>();
     Console.WriteLine("Informe o PIN pessoal do gerente pela entrada padrão (não será exibido nem salvo na configuração).");
-    var pin = await Console.In.ReadLineAsync()
+    // O PowerShell pode enviar a marca de codificação (BOM) antes do texto redirecionado.
+    var pin = (await Console.In.ReadLineAsync())?.Trim('﻿', ' ', '\t')
         ?? throw new InvalidOperationException("Nenhum PIN informado. Instalação incompleta.");
     await usuarios.CriarGerenteInicialAsync(builder.Configuration["Instalacao:NomeGerente"] ?? "Dono", pin);
     File.Delete(pendenciaInstalacao);

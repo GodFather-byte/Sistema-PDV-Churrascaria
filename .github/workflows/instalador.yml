@@ -1,0 +1,51 @@
+name: Instalador
+
+# Gera o instalador do Windows. Uma tag v* (ex.: v1.2.0) também cria uma Release com o .exe anexado.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  instalador:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Definir versão
+        shell: pwsh
+        run: |
+          $versao = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "0.0.$env:GITHUB_RUN_NUMBER" }
+          "VERSAO=$versao" >> $env:GITHUB_ENV
+
+      - name: Testar
+        run: dotnet test -c Release
+
+      - name: Publicar (self-contained win-x64)
+        run: dotnet publish src/ChurrascariaPDV -c Release -r win-x64 --self-contained -p:Version=${{ env.VERSAO }} -o publicacao
+
+      - name: Gerar instalador
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          & $iscc "/DVersao=$env:VERSAO" instalador\PDV.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PDV-Instalador-${{ env.VERSAO }}
+          path: saida/*.exe
+
+      - name: Publicar Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: saida/*.exe
+          generate_release_notes: true

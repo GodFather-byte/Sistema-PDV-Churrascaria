@@ -88,7 +88,7 @@ public partial class Form1 : Form
             Bar(_productMode, Button("Novo / limpar", ClearProduct)),
             Bar(Field("SKU", _sku), Field("Nome", _name), Field("Categoria", _category)),
             Bar(Field("Preço", _price), _hasCost, Field("Custo opcional", _cost), _active,
-                Button("Salvar", SaveProduct), Button("Excluir selecionado", DeleteProduct),
+                Button("Salvar", SaveProduct), Button("Excluir (inativar)", DeleteProduct),
                 Button("Atualizar", RefreshProducts)));
         _cost.Enabled = false;
         _hasCost.CheckedChanged += (_, _) => _cost.Enabled = _hasCost.Checked;
@@ -122,12 +122,13 @@ public partial class Form1 : Form
 
     private void DeleteProduct()
     {
-        var product = RequireSelection<Product>(_products, "Selecione o produto para excluir.");
-        if (!Confirm($"Excluir o produto {product.Sku} — {product.Name}? Esta ação não é desfeita pela tela.")) return;
+        var product = RequireSelection<Product>(_products, "Selecione o produto para inativar.");
+        if (!Confirm($"Excluir (inativar) o produto {product.Sku} — {product.Name}?\n" +
+            "O histórico será preservado. É possível reativar ao editar o produto, marcar Ativo e salvar.")) return;
         _service.DeleteProduct(product.Id, _operator);
         RefreshProducts();
         ClearProduct();
-        Notice("Produto excluído.");
+        Notice("Produto inativado; histórico preservado. Para reativar, edite o produto, marque Ativo e salve.");
     }
 
     private void ClearProduct()

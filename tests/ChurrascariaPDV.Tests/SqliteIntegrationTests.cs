@@ -6,7 +6,7 @@ namespace ChurrascariaPDV.Tests;
 
 public sealed class SqliteIntegrationTests : IDisposable
 {
-    private readonly string directory = Path.Combine(Directory.GetCurrentDirectory(), ".test-data", Guid.NewGuid().ToString("N"));
+    private readonly string directory = Path.Combine(Path.GetTempPath(), "ChurrascariaPDV.Tests", Guid.NewGuid().ToString("N"));
     private readonly string path;
     private readonly SqlitePdvService service;
     private const string Operator = "Operador teste";

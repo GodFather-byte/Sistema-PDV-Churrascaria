@@ -19,9 +19,10 @@ public record ProdutoCardapio(
     SetorImpressao? SetorImpressao,
     IReadOnlyList<GrupoCardapio> Grupos,
     RegraPrecoSabores RegraPrecoSabores = RegraPrecoSabores.MaiorValor,
-    int MaximoSabores = 2)
+    int MaximoSabores = 2,
+    bool QuantidadeFracionada = false)
 {
-    public bool TemModificadores => Grupos.Any(grupo => grupo.Opcoes.Count > 0);
+    public bool TemModificadores => QuantidadeFracionada || Grupos.Any(grupo => grupo.Opcoes.Count > 0);
 }
 
 public record CategoriaCardapio(int Id, string Nome, IReadOnlyList<ProdutoCardapio> Produtos);
@@ -58,7 +59,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
             .OrderByDescending(g => g.Obrigatorio).ThenBy(g => g.Nome)
             .Select(g => new GrupoCardapio(g.Id, g.Nome, g.Obrigatorio, g.SelecaoUnica,
                 g.Opcoes.OrderBy(o => o.Id).Select(o => new OpcaoCardapio(o.Id, o.Nome, o.Preco)).ToList(), g.Sabores))
-            .ToList(), produto.RegraPrecoSabores, produto.MaximoSabores);
+            .ToList(), produto.RegraPrecoSabores, produto.MaximoSabores, produto.QuantidadeFracionada);
 
     // ---------- Administração ----------
 
@@ -169,6 +170,7 @@ public class CardapioService(IDbContextFactory<AppDbContext> dbFactory)
         produto.SetorImpressaoId = setorId;
         produto.Ativo = dados.Ativo;
         produto.ControlaEstoque = dados.ControlaEstoque;
+        produto.QuantidadeFracionada = dados.QuantidadeFracionada;
 
         produto.GruposModificadores.Clear();
         foreach (var grupoId in gruposIds)

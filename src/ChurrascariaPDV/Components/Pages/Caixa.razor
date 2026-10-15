@@ -9,12 +9,12 @@
 @inject RedeLocalService Rede
 @inject IJSRuntime JS
 
-<PageTitle>Caixa · Churrascaria</PageTitle>
+<PageTitle>Caixa · <NomeEstabelecimento /></PageTitle>
 
 <AreaProtegida @ref="_area" Area="caixa" Titulo="Caixa" Perfis="PerfisCaixa" OnEntrou="AoEntrarAsync">
     <div class="caixa">
         <header class="caixa-topo">
-            <div class="caixa-marca">🔥 Churrascaria PDV</div>
+            <div class="caixa-marca"><NomeEstabelecimento /> · PDV</div>
             <div class="indicador">
                 <span>Mesas ocupadas</span>
                 <strong>@_indicadores.MesasOcupadas<small>/@_indicadores.TotalMesas</small></strong>

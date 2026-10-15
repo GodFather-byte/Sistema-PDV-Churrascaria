@@ -79,6 +79,7 @@ public class CaixaService(
             throw new RegraNegocioException("Já existe um turno de caixa aberto.");
         }
 
+        await UsuarioService.ValidarOperacaoAsync(db, usuarioId);
         db.TurnosCaixa.Add(new TurnoCaixa
         {
             FundoTroco = CalculoConta.Arredondar(fundoTroco),
@@ -105,6 +106,7 @@ public class CaixaService(
         await using var db = await dbFactory.CreateDbContextAsync();
         var turno = await db.TurnosCaixa.FirstOrDefaultAsync(t => t.DataHoraFechamento == null)
                     ?? throw new RegraNegocioException("Não há turno de caixa aberto.");
+        await UsuarioService.ValidarOperacaoAsync(db, usuarioId);
 
         if (tipo == TipoMovimentacaoCaixa.Sangria)
         {
@@ -145,6 +147,7 @@ public class CaixaService(
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
+        await UsuarioService.ValidarOperacaoAsync(db, usuarioId);
         var turno = await db.TurnosCaixa.Include(t => t.UsuarioAbertura).FirstOrDefaultAsync(t => t.DataHoraFechamento == null)
                     ?? throw new RegraNegocioException("Não há turno de caixa aberto.");
 

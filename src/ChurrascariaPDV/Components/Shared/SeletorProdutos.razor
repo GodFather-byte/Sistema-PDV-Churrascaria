@@ -19,7 +19,7 @@
         {
             <button type="button" class="produto" @onclick="() => Escolher(produto)">
                 <span class="produto-nome">@produto.Nome</span>
-                <span class="produto-preco">@Formato.Moeda(produto.Preco)</span>
+                <span class="produto-preco">@(produto.Grupos.Any(g => g.Sabores) ? "Preço conforme sabores" : Formato.Moeda(produto.Preco))</span>
                 @if (produto.TemModificadores)
                 {
                     <span class="produto-mod">opções</span>
@@ -76,7 +76,16 @@
             </div>
             <div class="modificador-quantidade">
                 <button type="button" @onclick="() => _quantidade = Math.Max(1, _quantidade - 1)">−</button>
-                <span>@_quantidade</span>
+                @if (produto.QuantidadeFracionada)
+                {
+                    <label>Quantidade (ex.: kg)
+                        <InputNumber class="form-control" min="0.001" max="999" step="0.001" @bind-Value="_quantidade" />
+                    </label>
+                }
+                else
+                {
+                    <span>@_quantidade</span>
+                }
                 <button type="button" @onclick="() => _quantidade = Math.Min(99, _quantidade + 1)">+</button>
             </div>
             @if (_erroModificador is not null)
@@ -105,7 +114,7 @@
     private ProdutoCardapio? _produtoModificador;
     private readonly HashSet<int> _opcoesSelecionadas = [];
     private string? _observacao;
-    private int _quantidade = 1;
+    private decimal _quantidade = 1;
     private string? _erroModificador;
     private string PrecoSelecao
     {
@@ -181,6 +190,8 @@
 
         try
         {
+            if (_quantidade is <= 0 or > 999 || decimal.Round(_quantidade, 3) != _quantidade)
+                throw new RegraNegocioException("Informe quantidade positiva de até 999 com no máximo 3 casas decimais.");
             CalculoPrecoProduto.Calcular(produto, _opcoesSelecionadas);
         }
         catch (RegraNegocioException ex)

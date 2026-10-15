@@ -69,6 +69,8 @@ public sealed class AmbienteTeste : IAsyncDisposable
         await using (var db = await provider.GetRequiredService<IDbContextFactory<AppDbContext>>().CreateDbContextAsync())
         {
             await db.Database.MigrateAsync();
+            // Os usuários da fixture representam contas que já concluíram o primeiro acesso.
+            await db.Usuarios.ExecuteUpdateAsync(u => u.SetProperty(x => x.TrocaPinObrigatoria, false));
         }
 
         return new AmbienteTeste(conexao, provider);

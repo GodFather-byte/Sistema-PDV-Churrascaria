@@ -12,6 +12,7 @@ using static ChurrascariaPDV.Tests.AmbienteTeste;
 
 namespace ChurrascariaPDV.Tests;
 
+[Collection("Impressao TCP")]
 public class SetorImpressaoTests
 {
     [Fact]
@@ -42,6 +43,9 @@ public class SetorImpressaoTests
         comando.CommandText = "PRAGMA foreign_key_check";
         Assert.Null(await comando.ExecuteScalarAsync());
     }
+
+    [CollectionDefinition("Impressao TCP", DisableParallelization = true)]
+    public class ImpressaoTcpCollection;
 
     [Fact]
     public async Task MigrationDeRegrasPreservaGruposPersonalizadosEItensAnteriores()

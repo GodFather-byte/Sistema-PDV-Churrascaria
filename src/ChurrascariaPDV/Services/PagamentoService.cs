@@ -28,6 +28,7 @@ public class PagamentoService(IDbContextFactory<AppDbContext> dbFactory, Notific
         await using var db = await dbFactory.CreateDbContextAsync();
         await using var transacao = await db.Database.BeginTransactionAsync();
 
+        await UsuarioService.ValidarOperacaoAsync(db, novo.UsuarioId);
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         var turno = await db.TurnosCaixa.FirstOrDefaultAsync(t => t.DataHoraFechamento == null)
                     ?? throw new RegraNegocioException("Abra o caixa (turno) antes de receber pagamentos.");

@@ -43,7 +43,7 @@ public class PedidoService(
         var perfil = await PerfilEstabelecimentoAtual.ObterAsync(db);
         await using var transacao = await db.Database.BeginTransactionAsync();
 
-        var garcom = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == novo.UsuarioId && u.Ativo)
+        var garcom = await db.Usuarios.FirstOrDefaultAsync(u => u.Id == novo.UsuarioId && u.Ativo && !u.TrocaPinObrigatoria)
                      ?? throw new RegraNegocioException("Usuário inválido. Faça login novamente.");
         var mesa = await ContaMesa.ObterMesaAsync(db, novo.MesaId);
 

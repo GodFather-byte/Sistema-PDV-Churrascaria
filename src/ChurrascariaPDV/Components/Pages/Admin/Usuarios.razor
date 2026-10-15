@@ -27,7 +27,7 @@
                 }
             </tbody>
         </table>
-        <p class="text-muted small mb-0">PINs iniciais de demonstração: Gerente 1234 · Caixa 2222 · João 1111 · Maria 3333. Troque-os antes de usar em produção.</p>
+        <p class="text-muted small mb-0">Cada usuário deve trocar seu PIN provisório no primeiro acesso. Ao editar, deixe o PIN vazio para manter o atual.</p>
     </div>
 
     <Modal Aberto="_editando is not null" Titulo="@(_editando?.Id == 0 ? "Novo usuário" : "Editar usuário")" OnFechar="() => _editando = null">
@@ -44,7 +44,7 @@
                     }
                 </select>
                 <label class="form-label">PIN (4 dígitos)</label>
-                <input class="form-control mb-2 pin-input" inputmode="numeric" maxlength="4" @bind="_editando.PinAcesso" />
+                <input type="password" class="form-control mb-2 pin-input" inputmode="numeric" maxlength="4" @bind="_editando.PinAcesso" />
                 <div class="form-check">
                     <input id="usuario-ativo" class="form-check-input" type="checkbox" @bind="_editando.Ativo" />
                     <label class="form-check-label" for="usuario-ativo">Ativo</label>
@@ -68,7 +68,7 @@
 
     private void Editar(Usuario? usuario) => _editando = usuario is null
         ? new Usuario { Perfil = PerfilUsuario.Garcom, Ativo = true }
-        : new Usuario { Id = usuario.Id, Nome = usuario.Nome, PinAcesso = usuario.PinAcesso, Perfil = usuario.Perfil, Ativo = usuario.Ativo };
+        : new Usuario { Id = usuario.Id, Nome = usuario.Nome, Perfil = usuario.Perfil, Ativo = usuario.Ativo };
 
     private async Task SalvarAsync()
     {

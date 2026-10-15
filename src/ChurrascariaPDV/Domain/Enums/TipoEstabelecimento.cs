@@ -7,5 +7,6 @@ public enum TipoEstabelecimento
     Churrascaria,
     Pizzaria,
     Hamburgueria,
-    Outro
+    Outro,
+    RestaurantePorQuilo
 }

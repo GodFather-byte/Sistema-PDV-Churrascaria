@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using ChurrascariaPDV.Services;
 
 namespace ChurrascariaPDV.Infrastructure.Data;
 
@@ -13,7 +14,20 @@ public static class BancoDeDados
         await using var db = await factory.CreateDbContextAsync();
 
         await PreservarBancoLegadoAsync(db, logger);
+        var novo = !(await db.Database.GetAppliedMigrationsAsync()).Any();
         await db.Database.MigrateAsync();
+        if (novo)
+        {
+            var configuracao = scope.ServiceProvider.GetRequiredService<IConfiguration>()
+                .GetSection("Instalacao").Get<InstalacaoOptions>() ?? new InstalacaoOptions();
+            await SeedPerfil.AplicarAsync(db, configuracao);
+        }
+        foreach (var usuario in await db.Usuarios.ToListAsync())
+        {
+            if (UsuarioService.PinValido(usuario.PinAcesso))
+                usuario.PinAcesso = UsuarioService.ProtegerPin(usuario, usuario.PinAcesso);
+        }
+        await db.SaveChangesAsync();
         await db.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
     }
 

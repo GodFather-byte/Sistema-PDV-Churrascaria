@@ -54,6 +54,7 @@ public static class Formato
     {
         Domain.Enums.TipoEstabelecimento.Bar => "Bar",
         Domain.Enums.TipoEstabelecimento.Restaurante => "Restaurante",
+        Domain.Enums.TipoEstabelecimento.RestaurantePorQuilo => "Restaurante por quilo",
         Domain.Enums.TipoEstabelecimento.Churrascaria => "Churrascaria",
         Domain.Enums.TipoEstabelecimento.Pizzaria => "Pizzaria",
         Domain.Enums.TipoEstabelecimento.Hamburgueria => "Hamburgueria",

@@ -1,0 +1,7 @@
+@inject PerfilEstabelecimentoService Perfis
+@_nome
+
+@code {
+    private string _nome = "PDV";
+    protected override async Task OnInitializedAsync() => _nome = (await Perfis.ObterAsync()).Nome;
+}

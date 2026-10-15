@@ -34,11 +34,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(setor => setor.Ip).HasMaxLength(45).IsRequired();
             entity.HasIndex(setor => setor.Nome).IsUnique();
             entity.HasIndex(setor => setor.RecebeContas).IsUnique().HasFilter("\"RecebeContas\" = 1");
-            entity.HasData(
-                new SetorImpressao { Id = SetorImpressao.BarCopa, Nome = "Bar / Copa", Ip = "192.168.0.101", Ordem = 1, ItensEmDestaque = false },
-                new SetorImpressao { Id = SetorImpressao.Cozinha, Nome = "Cozinha", Ip = "192.168.0.102", Ordem = 2 },
-                new SetorImpressao { Id = SetorImpressao.Churrasqueira, Nome = "Churrasqueira", Ip = "192.168.0.103", Ordem = 3, ObservacoesEmDestaque = true },
-                new SetorImpressao { Id = SetorImpressao.Caixa, Nome = "Caixa", Ip = "192.168.0.100", Ordem = 4, RecebeContas = true });
         });
 
         modelBuilder.Entity<PerfilEstabelecimento>(entity =>
@@ -48,16 +43,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(perfil => perfil.Endereco).HasMaxLength(250).IsRequired();
             entity.Property(perfil => perfil.PercentualTaxaServico).HasPrecision(5, 2);
             entity.Property(perfil => perfil.LarguraTicket).HasDefaultValue(48);
-            entity.HasData(new PerfilEstabelecimento
-            {
-                Id = PerfilEstabelecimento.IdPadrao,
-                Tipo = Domain.Enums.TipoEstabelecimento.Churrascaria,
-                Nome = "CHURRASCARIA",
-                Endereco = string.Empty,
-                PercentualTaxaServico = 10m,
-                TaxaServicoOpcionalPorComanda = true,
-                LarguraTicket = 48
-            });
         });
 
         modelBuilder.Entity<Mesa>(entity =>
@@ -267,69 +252,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Usuario>(entity =>
         {
             entity.Property(usuario => usuario.Nome).HasMaxLength(100).IsRequired();
-            entity.Property(usuario => usuario.PinAcesso).HasMaxLength(4).IsRequired();
+            entity.Property(usuario => usuario.PinAcesso).HasMaxLength(256).IsRequired();
             entity.Property(usuario => usuario.Perfil).HasConversion<string>();
             entity.HasIndex(usuario => usuario.PinAcesso).IsUnique();
         });
 
-        SeedData(modelBuilder);
-    }
-
-    private static void SeedData(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<Mesa>().HasData(
-            Enumerable.Range(1, 50).Select(numero => new Mesa
-            {
-                Id = numero,
-                Numero = numero,
-                CapacidadeLugares = numero <= 10 ? 2 : numero <= 35 ? 4 : 6,
-                Status = Domain.Enums.StatusMesa.Livre,
-                QuantidadePessoas = 0,
-                ValorTotalAtual = 0
-            }));
-
-        modelBuilder.Entity<Usuario>().HasData(
-            new Usuario { Id = 1, Nome = "Gerente", PinAcesso = "1234", Perfil = Domain.Enums.PerfilUsuario.Gerente, Ativo = true },
-            new Usuario { Id = 2, Nome = "Operador Caixa", PinAcesso = "2222", Perfil = Domain.Enums.PerfilUsuario.OperadorCaixa, Ativo = true },
-            new Usuario { Id = 3, Nome = "João", PinAcesso = "1111", Perfil = Domain.Enums.PerfilUsuario.Garcom, Ativo = true },
-            new Usuario { Id = 4, Nome = "Maria", PinAcesso = "3333", Perfil = Domain.Enums.PerfilUsuario.Garcom, Ativo = true });
-
-        modelBuilder.Entity<CategoriaProduto>().HasData(
-            new CategoriaProduto { Id = 1, Nome = "Rodízio" },
-            new CategoriaProduto { Id = 2, Nome = "Carnes" },
-            new CategoriaProduto { Id = 3, Nome = "Porções" },
-            new CategoriaProduto { Id = 4, Nome = "Bebidas" },
-            new CategoriaProduto { Id = 5, Nome = "Sobremesas" });
-
-        modelBuilder.Entity<Produto>().HasData(
-            new { Id = 1, Nome = "Rodízio Completo Adulto", Preco = 89.90m, CategoriaId = 1, TipoItem = Domain.Enums.TipoItem.Rodizio, SetorImpressaoId = (string?)null, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 2, Nome = "Rodízio Infantil", Preco = 44.90m, CategoriaId = 1, TipoItem = Domain.Enums.TipoItem.Rodizio, SetorImpressaoId = (string?)null, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 3, Nome = "Picanha na Tábua", Preco = 119.90m, CategoriaId = 2, TipoItem = Domain.Enums.TipoItem.CarneAlaCarte, SetorImpressaoId = SetorImpressao.Churrasqueira, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 4, Nome = "Costela no Bafo", Preco = 99.90m, CategoriaId = 2, TipoItem = Domain.Enums.TipoItem.CarneAlaCarte, SetorImpressaoId = SetorImpressao.Churrasqueira, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 5, Nome = "Polenta Frita", Preco = 32.90m, CategoriaId = 3, TipoItem = Domain.Enums.TipoItem.PorcaoCozinha, SetorImpressaoId = SetorImpressao.Cozinha, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 6, Nome = "Mandioca Frita", Preco = 34.90m, CategoriaId = 3, TipoItem = Domain.Enums.TipoItem.PorcaoCozinha, SetorImpressaoId = SetorImpressao.Cozinha, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 7, Nome = "Chopp 500ml", Preco = 14.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressaoId = SetorImpressao.BarCopa, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 8, Nome = "Refrigerante Lata", Preco = 8.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressaoId = SetorImpressao.BarCopa, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 9, Nome = "Suco Jarra", Preco = 22.90m, CategoriaId = 4, TipoItem = Domain.Enums.TipoItem.Bebida, SetorImpressaoId = SetorImpressao.BarCopa, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m },
-            new { Id = 10, Nome = "Petit Gateau", Preco = 24.90m, CategoriaId = 5, TipoItem = Domain.Enums.TipoItem.Sobremesa, SetorImpressaoId = SetorImpressao.Cozinha, Ativo = true, ControlaEstoque = false, QuantidadeEstoque = 0m });
-
-        modelBuilder.Entity<GrupoModificador>().HasData(
-            new GrupoModificador { Id = 1, Nome = "Ponto da Carne", Obrigatorio = true, SelecaoUnica = true },
-            new GrupoModificador { Id = 2, Nome = "Preferência Bebida", Obrigatorio = false, SelecaoUnica = false });
-
-        modelBuilder.Entity<OpcaoModificador>().HasData(
-            new OpcaoModificador { Id = 1, GrupoModificadorId = 1, Nome = "Malpassada" },
-            new OpcaoModificador { Id = 2, GrupoModificadorId = 1, Nome = "Ao Ponto" },
-            new OpcaoModificador { Id = 3, GrupoModificadorId = 1, Nome = "Bem Passada" },
-            new OpcaoModificador { Id = 4, GrupoModificadorId = 2, Nome = "Com Gelo e Limão" },
-            new OpcaoModificador { Id = 5, GrupoModificadorId = 2, Nome = "Sem Gelo" },
-            new OpcaoModificador { Id = 6, GrupoModificadorId = 2, Nome = "2 Copos" });
-
-        modelBuilder.Entity<GrupoModificadorProduto>().HasData(
-            new GrupoModificadorProduto { ProdutoId = 3, GrupoModificadorId = 1 },
-            new GrupoModificadorProduto { ProdutoId = 4, GrupoModificadorId = 1 },
-            new GrupoModificadorProduto { ProdutoId = 7, GrupoModificadorId = 2 },
-            new GrupoModificadorProduto { ProdutoId = 8, GrupoModificadorId = 2 },
-            new GrupoModificadorProduto { ProdutoId = 9, GrupoModificadorId = 2 });
     }
 }

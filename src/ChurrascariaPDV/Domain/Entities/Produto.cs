@@ -15,6 +15,7 @@ public class Produto
     public SetorImpressao? SetorImpressao { get; set; }
     public bool Ativo { get; set; } = true;
     public bool ControlaEstoque { get; set; }
+    public bool QuantidadeFracionada { get; set; }
     public decimal QuantidadeEstoque { get; set; }
     public CategoriaProduto Categoria { get; set; } = null!;
     public ICollection<ItemPedido> ItensPedido { get; set; } = new List<ItemPedido>();

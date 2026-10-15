@@ -5,7 +5,28 @@
 {
     <div class="pdv-carregando">Carregando…</div>
 }
-else if (Sessao.Usuario is { } usuario && Permitido(usuario))
+else if (_troca is { } pendente)
+{
+    <div class="tela-login"><div class="tela-login-cartao">
+        <h1>Trocar PIN · @pendente.Nome</h1>
+        <p>Antes de operar, escolha um PIN pessoal diferente do atual.</p>
+        <label class="form-label">Novo PIN</label>
+        <input type="password" class="form-control mb-2" inputmode="numeric" maxlength="4" @bind="_novoPin" />
+        <label class="form-label">Confirmar PIN</label>
+        <input type="password" class="form-control mb-2" inputmode="numeric" maxlength="4" @bind="_confirmacao" />
+        <Aviso Mensagem="@_erro" Tipo="erro" />
+        <button class="btn btn-brasa" disabled="@_verificando" @onclick="TrocarAsync">Trocar e entrar</button>
+        <button class="btn btn-secondary" @onclick="() => { _troca = null; _pinAtual = string.Empty; }">Voltar</button>
+    </div></div>
+}
+else if (!_temUsuarios)
+{
+    <div class="painel">
+        <h1>Instalação pendente</h1>
+        <p>Execute o assistente novo-estabelecimento.ps1 no computador do caixa para definir o gerente e seu PIN pessoal. Não há PIN padrão.</p>
+    </div>
+}
+else if (Sessao.Usuario is { TrocaPinObrigatoria: false } usuario && Permitido(usuario))
 {
     @ChildContent(usuario)
 }
@@ -39,10 +60,16 @@ else
     private bool _carregando = true;
     private bool _verificando;
     private string? _erro;
+    private bool _temUsuarios;
+    private UsuarioLogado? _troca;
+    private string _pinAtual = string.Empty;
+    private string _novoPin = string.Empty;
+    private string _confirmacao = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         var usuario = await Sessao.RestaurarAsync(Area);
+        _temUsuarios = await Usuarios.TemUsuariosAsync();
         _carregando = false;
         if (usuario is not null && Permitido(usuario))
         {
@@ -75,8 +102,37 @@ else
             _erro = $"{Formato.Perfil(usuario.Perfil)} não tem acesso aqui";
             return;
         }
+        if (usuario.TrocaPinObrigatoria)
+        {
+            _troca = usuario;
+            _pinAtual = pin;
+            _novoPin = _confirmacao = string.Empty;
+            return;
+        }
 
         await Sessao.EntrarAsync(Area, usuario);
         await OnEntrou.InvokeAsync(usuario);
+    }
+
+    private async Task TrocarAsync()
+    {
+        if (_troca is null) return;
+        _verificando = true;
+        try
+        {
+            var usuario = await Usuarios.TrocarPinAsync(_troca.Id, _pinAtual, _novoPin, _confirmacao);
+            _troca = null;
+            _pinAtual = _novoPin = _confirmacao = string.Empty;
+            await Sessao.EntrarAsync(Area, usuario);
+            await OnEntrou.InvokeAsync(usuario);
+        }
+        catch (RegraNegocioException ex)
+        {
+            _erro = ex.Message;
+        }
+        finally
+        {
+            _verificando = false;
+        }
     }
 }

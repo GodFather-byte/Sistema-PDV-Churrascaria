@@ -1,6 +1,6 @@
-# Sistema PDV Churrascaria
+# Sistema PDV configurável
 
-PDV (ponto de venda) e controle de mesas para churrascaria, rodando **100% local** no PC do caixa.
+PDV (ponto de venda) e controle de mesas configurável por estabelecimento, rodando **100% local** no PC do caixa.
 Os garçons lançam pedidos pelo celular conectado ao Wi-Fi do restaurante, sem internet externa.
 
 - **Caixa** (`/caixa`): tela desktop widescreen com mapa de mesas em tempo real, recebimento e atalhos F1–F12.
@@ -45,16 +45,22 @@ Copie a pasta `publicacao` para o PC do caixa junto com os arquivos de `scripts/
 em tela cheia. Também é possível executar `ChurrascariaPDV.exe` diretamente. Para abrir o caixa em tela cheia,
 use o navegador em modo quiosque, por exemplo: `msedge --kiosk http://localhost:5000/caixa --edge-kiosk-type=fullscreen`.
 
-## Acessos iniciais (PIN de 4 dígitos)
+## Primeiro acesso e perfis de exemplo
 
-| Usuário        | Perfil            | PIN  |
-|----------------|-------------------|------|
-| Gerente        | Gerente           | 1234 |
-| Operador Caixa | Operador de Caixa | 2222 |
-| João           | Garçom            | 1111 |
-| Maria          | Garçom            | 3333 |
+Instalações novas **não têm usuários ou PINs padrão**. Use o assistente de instalação para criar o gerente
+com PIN pessoal. O gerente cadastra a equipe em **Usuários e PINs** (`/admin/usuarios`).
+Usuários novos ou com PIN redefinido precisam escolher um PIN diferente antes de operar.
+Ao atualizar uma instalação existente, **todos os usuários** precisam trocar seus PINs no próximo acesso;
+sessões antigas não são restauradas enquanto a troca estiver pendente. PINs passam a ser armazenados
+como hashes com salt (PasswordHasher), não exibidos na administração.
 
-Troque os PINs em **Usuários e PINs** (`/admin/usuarios`) antes de usar em produção.
+O seed inicial é escolhido em `Instalacao:Tipo` e `Instalacao:Nome`, somente na criação do banco:
+Churrascaria (cardápio original), Pizzaria (sabores e forno), Hamburgueria (adicionais e chapa),
+Bar (petiscos e copa), RestaurantePorQuilo (buffet em kg) e Restaurante (prato do dia).
+O peso é lançado como quantidade decimal em kg; não há integração automática com balança.
+Produtos, categorias e setores são exemplos editáveis. Impressão começa simulada e sem IPs predefinidos.
+Alterar o perfil de um banco existente **não reaplica seed nem apaga cadastros ou vendas**.
+Cada instalação usa seu próprio banco; não há isolamento de múltiplos estabelecimentos no mesmo banco.
 
 ## Fluxo de operação
 

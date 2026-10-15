@@ -137,6 +137,7 @@
                         <input type="number" min="1" max="8" class="form-control" @bind="_produto.MaximoSabores" />
                     </div>
                 </div>
+                <label class="d-block mb-2"><input type="checkbox" @bind="_produto.QuantidadeFracionada" /> Permitir informar quantidade decimal (ex.: peso em kg)</label>
                 <div class="form-check">
                     <input id="produto-ativo" class="form-check-input" type="checkbox" @bind="_produto.Ativo" />
                     <label class="form-check-label" for="produto-ativo">Ativo (aparece no cardápio)</label>
@@ -236,6 +237,7 @@
         _precoProduto = Formato.ValorEditavel(_produto.Preco);
         _produto.RegraPrecoSabores = produto?.RegraPrecoSabores ?? RegraPrecoSabores.MaiorValor;
         _produto.MaximoSabores = produto?.MaximoSabores ?? 2;
+        _produto.QuantidadeFracionada = produto?.QuantidadeFracionada ?? false;
         _gruposProduto = produto?.GruposModificadores.Select(g => g.GrupoModificadorId).ToHashSet() ?? [];
     }
 

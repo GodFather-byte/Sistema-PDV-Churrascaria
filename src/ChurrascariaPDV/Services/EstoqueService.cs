@@ -65,7 +65,7 @@ public class EstoqueService(IDbContextFactory<AppDbContext> dbFactory, Notificad
         await using var db = await dbFactory.CreateDbContextAsync();
         await using var transacao = await db.Database.BeginTransactionAsync();
         var usuario = await db.Usuarios.FirstOrDefaultAsync(u =>
-            u.Id == usuarioId && u.Ativo && u.Perfil == PerfilUsuario.Gerente);
+            u.Id == usuarioId && u.Ativo && !u.TrocaPinObrigatoria && u.Perfil == PerfilUsuario.Gerente);
         if (usuario is null)
         {
             throw new RegraNegocioException("Somente um gerente ativo pode ajustar o estoque.");
